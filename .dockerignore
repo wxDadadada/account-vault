@@ -1,0 +1,16 @@
+node_modules
+.git
+.env
+.env.*
+!.env.example
+data
+work
+backups
+build
+dist
+coverage
+*.sqlite*
+*.keyfolio.json
+server.key
+docs
+.DS_Store

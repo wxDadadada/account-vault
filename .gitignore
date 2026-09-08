@@ -1,0 +1,35 @@
+# Dependencies and generated output
+node_modules/
+/dist/
+/build/
+/coverage/
+
+# Logs and local verification artifacts
+logs/
+/work/
+*.log
+*.local
+
+# Local configuration and private vault data
+.env
+.env.*
+!.env.example
+/data/
+/backups/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.keyfolio.json
+server.key
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

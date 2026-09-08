@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+data/
+work/
+backups/
+coverage/
+pnpm-lock.yaml
+src/components/ui/
+docs/archive/
