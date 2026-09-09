@@ -4,8 +4,6 @@
 
 基于 [satnaing/shadcn-admin](https://github.com/satnaing/shadcn-admin) 改造。采用 React + TypeScript + shadcn/ui，后端使用 Node.js + Fastify，数据库为 SQLite + Drizzle。一个容器同时提供前端和 API。
 
-界面采用暖纸色的私人档案册风格：顶部切换页面，左侧按主体查看，账号列表直接提供复制与编辑。桌面快速录入位于页头，手机保留底部导航与新增入口；账号详情、按日分组的变更记录和 AI 聊天同步适配深色与窄屏。完整约定见 [界面规范](docs/design.md)。
-
 ## 已实现
 
 - 账号增删改查、收藏、标签、状态、登录入口、密码生成与复制。

@@ -42,7 +42,7 @@ test.afterEach(async ({ page, baseURL }) => {
 test('manual exit can be cancelled and only confirmation revokes the session and locks other pages', async ({
   page,
   context,
-}) => {
+}, info) => {
   let logouts = 0
   page.on('request', (request) => {
     if (request.url().endsWith('/api/auth/logout')) logouts++
@@ -66,7 +66,9 @@ test('manual exit can be cancelled and only confirmation revokes the session and
   await page.keyboard.press('Escape')
   await expect(confirmation).toHaveCount(0)
   expect(logouts).toBe(0)
-  await requestExit(page)
+  if (info.project.name === 'desktop')
+    await page.locator('.profile-button').click()
+  else await requestExit(page)
   await expect(confirmation).toHaveAttribute('data-state', 'open')
   await page.screenshot({
     path: test.info().outputPath('exit-confirmation.png'),

@@ -302,7 +302,7 @@ export function SettingsPage() {
       </div>
       <div className='about-line'>
         <span>
-          <ShieldCheck size={15} /> 拾钥 Keyfolio · 0.2.0
+          <ShieldCheck size={15} /> 拾钥 Keyfolio · 0.1.2
         </span>
         <a
           href='https://github.com/satnaing/shadcn-admin'
