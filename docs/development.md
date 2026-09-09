@@ -27,7 +27,7 @@ account-vault/
 ├── public/                     # 网站图标与 Web App Manifest
 ├── docs/                       # 当前文档；历史材料在 archive/
 ├── Dockerfile                  # 多阶段构建和运行镜像
-└── compose.yaml                # 本机部署、命名卷和服务配置
+└── docker-compose.yml          # 镜像部署、命名卷和服务配置
 ```
 
 ## 文件归属
@@ -58,7 +58,7 @@ account-vault/
 | `pnpm exec playwright test`      | 对现有构建运行浏览器回归，与 CI 用法相同        |
 | `pnpm test:docker`               | 对 `keyfolio:local` 镜像运行独立容器演练        |
 
-首次运行浏览器测试需执行 `pnpm exec playwright install chromium`。容器演练前需启动 Docker 并执行 `docker compose build`。
+首次运行浏览器测试需执行 `pnpm exec playwright install chromium`。容器演练前需启动 Docker 并执行 `docker build -t keyfolio:local .`。
 
 ## 依赖与配置
 

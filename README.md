@@ -34,26 +34,20 @@
 
 源码仓库：[wxDadadada/account-vault](https://github.com/wxDadadada/account-vault)。镜像仓库：[wxdadadada/account-vault](https://hub.docker.com/r/wxdadadada/account-vault)，提供 `linux/amd64` 和 `linux/arm64`，版本标签为 `0.1.0`，`latest` 指向最近发布版。
 
-使用发布镜像：
+只需下载 `docker-compose.yml`，默认使用发布镜像，无需源码或 `.env`：
 
 ```bash
-git clone https://github.com/wxDadadada/account-vault.git
+mkdir -p account-vault
 cd account-vault
-cp .env.example .env
+curl -fsSL https://raw.githubusercontent.com/wxDadadada/account-vault/main/docker-compose.yml -o docker-compose.yml
+docker compose up -d
 ```
 
-将 `.env` 中的 `IMAGE` 改为 `wxdadadada/account-vault:0.1.0`，然后运行：
+需要从源码构建时，在克隆后的项目根目录执行以下命令，并将可选 `.env` 中的 `IMAGE` 设为 `keyfolio:local`，供后续启动使用：
 
 ```bash
-docker compose pull
-docker compose up -d --no-build
-```
-
-需要从源码构建时，保留 `IMAGE=keyfolio:local` 并执行：
-
-```bash
-# 在项目根目录执行
-docker compose up -d --build
+docker build -t keyfolio:local .
+IMAGE=keyfolio:local docker compose up -d
 ```
 
 浏览器打开 **http://localhost:4318**。首次创建用户名和至少 12 个字符的主密码，保存恢复密钥，即可使用。
@@ -141,7 +135,7 @@ pnpm test:docker
 - `tests/`：加密、业务、接口和部署边界测试。
 - `tests/browser/`：桌面与手机浏览器回归测试。
 - `scripts/`：开发与生产启动、构建清理和隔离验证脚本。
-- `Dockerfile`、`compose.yaml`：单容器部署。
+- `Dockerfile`：源码构建；`docker-compose.yml`：直接拉取镜像并部署。
 
 完整目录约定、常用命令与维护方式见 [开发与目录约定](docs/development.md)，文档入口见 [docs/README.md](docs/README.md)。
 

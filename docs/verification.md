@@ -35,7 +35,7 @@ pnpm test:browser
 需要检查镜像时单独执行：
 
 ```bash
-docker compose build
+docker build -t keyfolio:local .
 pnpm test:docker
 ```
 

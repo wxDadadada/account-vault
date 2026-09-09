@@ -4,25 +4,31 @@
 
 源码位于 [wxDadadada/account-vault](https://github.com/wxDadadada/account-vault)，镜像位于 [wxdadadada/account-vault](https://hub.docker.com/r/wxdadadada/account-vault)。镜像支持 `linux/amd64` 与 `linux/arm64`，Docker 会选择匹配的架构。固定版本使用 `0.1.0`，`latest` 随发布更新。
 
+单文件部署只需 Docker 和 Compose，无需克隆源码或准备 `.env`：
+
 ```bash
-git clone https://github.com/wxDadadada/account-vault.git
+mkdir -p account-vault
 cd account-vault
-cp .env.example .env
-```
-
-将 `.env` 中的 `IMAGE` 改为 `wxdadadada/account-vault:0.1.0`。本机访问保留其余默认配置；远程访问按下文设置 `APP_ORIGIN`、`TRUSTED_PROXIES` 和 HTTPS 代理。
-
-```bash
-docker compose pull
-docker compose up -d --no-build
+curl -fsSL https://raw.githubusercontent.com/wxDadadada/account-vault/main/docker-compose.yml -o docker-compose.yml
+docker compose up -d
 docker compose ps
 ```
 
-直接使用镜像时，服务器只需 Docker 和 Compose。`.env` 中的镜像选择应持续保留，以便后续启动和更新使用同一镜像来源。源码构建使用 `IMAGE=keyfolio:local` 与 `docker compose up -d --build`。
+`docker-compose.yml` 默认使用 `wxdadadada/account-vault:0.1.0`，自动选择 CPU 架构。可直接修改文件中的默认值，或在同目录创建 `.env` 覆盖配置；源码仓库中的 `.env.example` 提供完整示例。远程访问按下文设置 `APP_ORIGIN`、`TRUSTED_PROXIES` 和 HTTPS 代理。
+
+后续拉取目标版本并启动：
+
+```bash
+docker compose pull
+docker compose up -d
+docker compose ps
+```
+
+自定义 `IMAGE` 时，应将选择持续保存在 Compose 文件或 `.env` 中，以便后续启动和更新使用同一镜像来源。源码构建见本文末尾。
 
 ## 本机 Docker
 
-在项目目录运行 `docker compose up -d --build`，打开 `http://localhost:4318`。Compose 默认仅绑定宿主机回环地址，数据位于持久卷。容器使用非 root 用户、只读根文件系统和独立可写数据卷。
+在 `docker-compose.yml` 所在目录运行 `docker compose up -d`，打开 `http://localhost:4318`。Compose 默认仅绑定宿主机回环地址，数据位于持久卷。容器使用非 root 用户、只读根文件系统和独立可写数据卷。
 
 查看实际卷名：
 
@@ -30,15 +36,15 @@ docker compose ps
 docker inspect "$(docker compose ps -q app)" --format '{{json .Mounts}}'
 ```
 
-默认项目名下的卷通常为 `account-vault_keyfolio_data`。以上命令从正在运行的应用容器中读取实际 Mounts；核实卷名后再做恢复操作。
+默认项目名为 `account-vault`，数据卷为 `account-vault_keyfolio_data`；使用 `-p` 或 `COMPOSE_PROJECT_NAME` 覆盖项目名时，卷名前缀也会改变。以上命令从正在运行的应用容器中读取实际 Mounts；核实卷名后再做恢复操作。
 
 ## 远程 HTTPS
 
-1. 复制 `.env.example` 为 `.env`。
+1. 在 `docker-compose.yml` 同目录创建 `.env`；克隆了源码时也可复制 `.env.example` 为 `.env`。
 2. 将 `APP_ORIGIN` 改为最终访问地址，例如 `https://vault.example.com`。它必须与浏览器地址的协议、域名和端口一致。
 3. 设置 `TRUSTED_PROXIES` 为应用实际看到的直连代理 IP 或精确 CIDR，英文逗号分隔。本地 Node 与同机代理通常为 `127.0.0.1,::1`；Docker 中可能是桥接网关，不能直接套用回环地址。只填写自己控制的代理，禁止全网范围。
 4. 用宿主机反向代理提供 TLS，将请求转发至 `127.0.0.1:4318`。保留请求的 Cookie、Origin 和自定义头，覆盖外部传入的客户端 IP 头，不缓存 `/api/`。后端保持回环绑定。
-5. 运行 `docker compose up -d --build`。
+5. 运行 `docker compose up -d`。
 6. 从服务器读取首次初始化令牌：
 
 ```bash
@@ -75,16 +81,16 @@ docker inspect "$(docker compose ps -q app)" --format '{{range .NetworkSettings.
 
 ## 配置项
 
-| 变量               | 默认值                                | 用途                                                          |
-| ------------------ | ------------------------------------- | ------------------------------------------------------------- |
-| `IMAGE`            | `keyfolio:local`                      | Compose 镜像名；发布镜像使用 `wxdadadada/account-vault:0.1.0` |
-| `APP_ORIGIN`       | `http://localhost:4318`               | 浏览器实际访问来源；远程须为 HTTPS                            |
-| `PORT`             | `4318`                                | Compose 宿主机映射端口；Node 直接运行时为服务监听端口         |
-| `HOST`             | Node 为 `127.0.0.1`，容器为 `0.0.0.0` | 服务绑定地址                                                  |
-| `DATA_DIR`         | Node 为 `./data`，容器为 `/app/data`  | SQLite 与服务密钥目录                                         |
-| `BACKUP_DIR`       | 数据目录下 `backups`                  | SQLite 在线快照目录                                           |
-| `AI_ALLOWED_HOSTS` | 见 `.env.example`                     | 允许连接的 AI 域名，英文逗号分隔                              |
-| `TRUSTED_PROXIES`  | 空                                    | 可信直连代理 IP/CIDR；远程部署必填，本机直连可留空            |
+| 变量               | 默认值                                | 用途                                                  |
+| ------------------ | ------------------------------------- | ----------------------------------------------------- |
+| `IMAGE`            | `wxdadadada/account-vault:0.1.0`      | Compose 镜像名；自行构建时可使用 `keyfolio:local`     |
+| `APP_ORIGIN`       | `http://localhost:4318`               | 浏览器实际访问来源；远程须为 HTTPS                    |
+| `PORT`             | `4318`                                | Compose 宿主机映射端口；Node 直接运行时为服务监听端口 |
+| `HOST`             | Node 为 `127.0.0.1`，容器为 `0.0.0.0` | 服务绑定地址                                          |
+| `DATA_DIR`         | Node 为 `./data`，容器为 `/app/data`  | SQLite 与服务密钥目录                                 |
+| `BACKUP_DIR`       | 数据目录下 `backups`                  | SQLite 在线快照目录                                   |
+| `AI_ALLOWED_HOSTS` | 见 `.env.example`                     | 允许连接的 AI 域名，英文逗号分隔                      |
+| `TRUSTED_PROXIES`  | 空                                    | 可信直连代理 IP/CIDR；远程部署必填，本机直连可留空    |
 
 修改 Compose 的 `PORT` 时也要修改 `APP_ORIGIN`。更改变量后用 `docker compose up -d` 重建容器，而非只运行 `restart`。
 
@@ -124,14 +130,15 @@ Compose 的 `.env` 用于变量插值，`IMAGE` 选择镜像，`PORT` 用于宿�
 
 ```bash
 docker compose pull
-docker compose up -d --no-build
+docker compose up -d
 docker compose ps
 ```
 
-使用源码构建时，更新代码并运行：
+使用源码构建时，克隆或更新代码，在项目根目录运行以下命令。将 `.env` 的 `IMAGE` 设为 `keyfolio:local`，使后续启动继续使用本地镜像：
 
 ```bash
-docker compose up -d --build
+docker build -t keyfolio:local .
+IMAGE=keyfolio:local docker compose up -d
 docker compose ps
 ```
 
