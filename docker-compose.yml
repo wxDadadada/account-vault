@@ -4,10 +4,11 @@ name: account-vault
 
 services:
   app:
-    image: ${IMAGE:-wxdadadada/account-vault:0.1.0}
+    image: ${IMAGE:-wxdadadada/account-vault:latest}
+    pull_policy: always
     restart: unless-stopped
     ports:
-      - '127.0.0.1:${PORT:-8188}:4318'
+      - '127.0.0.1:${PORT:-8188}:8188'
     environment:
       APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8188}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}

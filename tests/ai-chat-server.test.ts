@@ -10,7 +10,7 @@ import { fixtureVault, master } from './fixtures'
 test('authenticated chat validates both directions, forwards context, and never saves the vault', async () => {
   mkdirSync(resolve('work/tests'), { recursive: true })
   const directory = mkdtempSync(resolve('work/tests/chat-api-'))
-  const origin = 'http://localhost:4318'
+  const origin = 'http://localhost:8188'
   const headers = { origin, 'x-keyfolio': '1' }
   const calls: ChatRequest[] = []
   let result: unknown = {

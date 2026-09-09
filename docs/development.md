@@ -46,7 +46,7 @@ account-vault/
 | 命令                             | 用途                                            |
 | -------------------------------- | ----------------------------------------------- |
 | `pnpm install --frozen-lockfile` | 按锁文件安装依赖                                |
-| `pnpm dev`                       | 同时启动开发 API（4318）和前端（5188）          |
+| `pnpm dev`                       | 同时启动开发 API（8188）和前端（5188）          |
 | `pnpm dev:api` / `pnpm dev:web`  | 单独启动 API 或前端                             |
 | `pnpm clean`                     | 删除项目内 `build/` 和 `dist/`                  |
 | `pnpm build`                     | 先清理产物，再做类型检查、前端打包和后端编译    |

@@ -32,7 +32,7 @@
 
 需要 Docker 和 Docker Compose。
 
-源码仓库：[wxDadadada/account-vault](https://github.com/wxDadadada/account-vault)。镜像仓库：[wxdadadada/account-vault](https://hub.docker.com/r/wxdadadada/account-vault)，提供 `linux/amd64` 和 `linux/arm64`，版本标签为 `0.1.0`，`latest` 指向最近发布版。
+源码仓库：[wxDadadada/account-vault](https://github.com/wxDadadada/account-vault)。镜像仓库：[wxdadadada/account-vault](https://hub.docker.com/r/wxdadadada/account-vault)，提供 `linux/amd64` 和 `linux/arm64`，默认使用 `latest`，每次启动都会检查最新镜像。后续更新直接执行 `docker compose up -d`，无需修改版本号。
 
 只需下载 `docker-compose.yml`，默认使用发布镜像，无需源码或 `.env`：
 
@@ -43,11 +43,11 @@ curl -fsSL https://raw.githubusercontent.com/wxDadadada/account-vault/main/docke
 docker compose up -d
 ```
 
-需要从源码构建时，在克隆后的项目根目录执行以下命令，并将可选 `.env` 中的 `IMAGE` 设为 `keyfolio:local`，供后续启动使用：
+需要从源码构建时，在克隆后的项目根目录执行以下命令，并将可选 `.env` 中的 `IMAGE` 设为 `keyfolio:local`，供后续启动使用。本地镜像启动时保留 `--pull never`：
 
 ```bash
 docker build -t keyfolio:local .
-IMAGE=keyfolio:local docker compose up -d
+IMAGE=keyfolio:local docker compose up -d --pull never
 ```
 
 浏览器打开 **http://localhost:8188**。首次创建用户名和至少 12 个字符的主密码，保存恢复密钥，即可使用。
@@ -72,7 +72,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-前端为 **http://127.0.0.1:5188**，开发 API 为 `127.0.0.1:4318`，Docker 默认映射到宿主机 `8188` 端口。开发数据目录为项目内 `data/`，与 Docker 命名卷是两套独立存储。
+前端为 **http://127.0.0.1:5188**，开发 API 为 `127.0.0.1:8188`。Node 服务、Docker 容器内部与宿主机映射的默认端口统一为 `8188`；开发 API 与 Docker 同时运行时需另选宿主端口。开发数据目录为项目内 `data/`，与 Docker 命名卷是两套独立存储。
 
 本地生产运行：
 
@@ -81,7 +81,7 @@ pnpm build
 pnpm start
 ```
 
-`pnpm start` 读取可选的 `.env`，默认开启生产模式；未配置 `PORT` 时使用 4318，使用 `.env.example` 的配置时为 8188。`pnpm dev` 使用默认开发端口；自定义开发 API 端口时还需修改 `vite.config.ts` 中的代理目标。
+`pnpm start` 读取可选的 `.env`，默认开启生产模式并使用 `8188` 端口。`pnpm dev` 使用默认开发端口；自定义开发 API 端口时还需修改 `vite.config.ts` 中的代理目标。
 
 ## 日常使用
 

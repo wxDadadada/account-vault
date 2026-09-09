@@ -15,7 +15,7 @@ import {
 } from '../src/vault/lib/crypto'
 import { fixtureVault, master, nextMaster } from './fixtures'
 
-const headers = { 'x-keyfolio': '1', origin: 'http://localhost:4318' }
+const headers = { 'x-keyfolio': '1', origin: 'http://localhost:8188' }
 const cookieOf = (response: { headers: Record<string, unknown> }) =>
   String(response.headers['set-cookie']).split(';')[0]
 const wrongProof = Buffer.alloc(32).toString('base64')

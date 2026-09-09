@@ -29,7 +29,7 @@ let key: CryptoKey
 let profile: PublicProfile
 let session = ''
 let state: VaultResponse
-const baseHeaders = { 'x-keyfolio': '1', origin: 'http://localhost:4318' }
+const baseHeaders = { 'x-keyfolio': '1', origin: 'http://localhost:8188' }
 function cookieOf(response: { headers: Record<string, unknown> }) {
   const header = response.headers['set-cookie']
   return (Array.isArray(header) ? header[0] : (header as string)).split(';')[0]
@@ -37,7 +37,7 @@ function cookieOf(response: { headers: Record<string, unknown> }) {
 before(async () => {
   app = await buildApp({
     dataDir: directory,
-    origin: 'http://localhost:4318',
+    origin: 'http://localhost:8188',
     test: true,
   })
   credentials = await createCredentials('owner', master)
@@ -387,7 +387,7 @@ test('master rotation and process restart preserve usable data and invalidate ol
   await app.close()
   app = await buildApp({
     dataDir: directory,
-    origin: 'http://localhost:4318',
+    origin: 'http://localhost:8188',
     test: true,
   })
   const loggedIn = await app.inject({

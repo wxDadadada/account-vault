@@ -4,7 +4,7 @@ import { resolve } from 'node:path'
 import { buildApp } from './app.js'
 
 process.umask(0o077)
-const port = Number(process.env.PORT ?? 4318)
+const port = Number(process.env.PORT ?? 8188)
 const dataDir = resolve(process.env.DATA_DIR ?? './data')
 const origin = process.env.APP_ORIGIN ?? `http://localhost:${port}`
 let setupToken: string | undefined

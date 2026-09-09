@@ -2,7 +2,7 @@
 
 ## 使用 Docker Hub 镜像
 
-源码位于 [wxDadadada/account-vault](https://github.com/wxDadadada/account-vault)，镜像位于 [wxdadadada/account-vault](https://hub.docker.com/r/wxdadadada/account-vault)。镜像支持 `linux/amd64` 与 `linux/arm64`，Docker 会选择匹配的架构。固定版本使用 `0.1.0`，`latest` 随发布更新。
+源码位于 [wxDadadada/account-vault](https://github.com/wxDadadada/account-vault)，镜像位于 [wxdadadada/account-vault](https://hub.docker.com/r/wxdadadada/account-vault)。镜像支持 `linux/amd64` 与 `linux/arm64`，Docker 会选择匹配的架构。默认使用随发布更新的 `latest`；也保留固定版本标签，供需要时回退。
 
 单文件部署只需 Docker 和 Compose，无需克隆源码或准备 `.env`：
 
@@ -14,9 +14,9 @@ docker compose up -d
 docker compose ps
 ```
 
-`docker-compose.yml` 默认使用 `wxdadadada/account-vault:0.1.0`，自动选择 CPU 架构。可直接修改文件中的默认值，或在同目录创建 `.env` 覆盖配置；源码仓库中的 `.env.example` 提供完整示例。远程访问按下文设置 `APP_ORIGIN`、`TRUSTED_PROXIES` 和 HTTPS 代理。
+`docker-compose.yml` 默认使用 `wxdadadada/account-vault:latest`，自动选择 CPU 架构，并通过 `pull_policy: always` 在每次启动时检查最新镜像。后续更新无需修改版本号。可直接修改文件中的默认值，或在同目录创建 `.env` 覆盖配置；源码仓库中的 `.env.example` 提供完整示例。远程访问按下文设置 `APP_ORIGIN`、`TRUSTED_PROXIES` 和 HTTPS 代理。
 
-后续拉取目标版本并启动：
+后续更新并启动：
 
 ```bash
 docker compose pull
@@ -24,11 +24,11 @@ docker compose up -d
 docker compose ps
 ```
 
-自定义 `IMAGE` 时，应将选择持续保存在 Compose 文件或 `.env` 中，以便后续启动和更新使用同一镜像来源。源码构建见本文末尾。
+已有 `.env` 如果将 `IMAGE` 固定到旧版本，请改为 `wxdadadada/account-vault:latest`；之后更新无需再修改它。源码构建见本文末尾。
 
 ## 本机 Docker
 
-在 `docker-compose.yml` 所在目录运行 `docker compose up -d`，打开 `http://localhost:8188`。Compose 默认将宿主机 `127.0.0.1:8188` 映射到容器 `4318`，数据位于持久卷。容器使用非 root 用户、只读根文件系统和独立可写数据卷。
+在 `docker-compose.yml` 所在目录运行 `docker compose up -d`，打开 `http://localhost:8188`。Node 服务和容器内部监听 `8188`，Compose 默认将宿主机 `127.0.0.1:8188` 映射到容器 `8188`，健康检查也使用 `8188`。数据位于持久卷；容器使用非 root 用户、只读根文件系统和独立可写数据卷。
 
 查看实际卷名：
 
@@ -83,16 +83,16 @@ docker inspect "$(docker compose ps -q app)" --format '{{range .NetworkSettings.
 
 | 变量               | 默认值                                | 用途                                                  |
 | ------------------ | ------------------------------------- | ----------------------------------------------------- |
-| `IMAGE`            | `wxdadadada/account-vault:0.1.0`      | Compose 镜像名；自行构建时可使用 `keyfolio:local`     |
+| `IMAGE`            | `wxdadadada/account-vault:latest`     | Compose 镜像名；默认跟随最新发布版                    |
 | `APP_ORIGIN`       | `http://localhost:8188`               | Compose 浏览器实际访问来源；远程须为 HTTPS            |
-| `PORT`             | Compose 为 `8188`，Node 为 `4318`     | Compose 宿主机映射端口；Node 直接运行时为服务监听端口 |
+| `PORT`             | `8188`                                | Compose 宿主机映射端口；Node 直接运行时为服务监听端口 |
 | `HOST`             | Node 为 `127.0.0.1`，容器为 `0.0.0.0` | 服务绑定地址                                          |
 | `DATA_DIR`         | Node 为 `./data`，容器为 `/app/data`  | SQLite 与服务密钥目录                                 |
 | `BACKUP_DIR`       | 数据目录下 `backups`                  | SQLite 在线快照目录                                   |
 | `AI_ALLOWED_HOSTS` | 见 `.env.example`                     | 允许连接的 AI 域名，英文逗号分隔                      |
 | `TRUSTED_PROXIES`  | 空                                    | 可信直连代理 IP/CIDR；远程部署必填，本机直连可留空    |
 
-修改 Compose 的 `PORT` 时也要修改 `APP_ORIGIN`。已有 `.env` 会覆盖 Compose 默认值；从 4318 切换时，将其中的 `PORT` 改为 `8188`，本机访问的 `APP_ORIGIN` 改为 `http://localhost:8188`，远程 HTTPS 域名保持实际访问地址。更改变量后用 `docker compose up -d` 重建容器，而非只运行 `restart`。
+修改 Compose 的 `PORT` 时也要修改 `APP_ORIGIN`。已有 `.env` 会覆盖 Compose 默认值；升级旧配置时，将其中的 `PORT` 改为 `8188`，本机访问的 `APP_ORIGIN` 改为 `http://localhost:8188`，远程 HTTPS 域名保持实际访问地址。更改变量后用 `docker compose up -d` 重建容器，而非只运行 `restart`。
 
 Compose 的 `.env` 用于变量插值，`IMAGE` 选择镜像，`PORT` 用于宿主映射；仅将 `APP_ORIGIN`、`AI_ALLOWED_HOSTS`、`TRUSTED_PROXIES` 显式传入容器。`HOST`、`DATA_DIR`、`BACKUP_DIR` 需要在 Compose 的 environment/volumes 中显式配置；只修改 `.env` 不会改变它们。本地 `pnpm start` 会加载 `.env` 中的这些服务变量。
 
@@ -126,7 +126,7 @@ Compose 的 `.env` 用于变量插值，`IMAGE` 选择镜像，`PORT` 用于宿�
 
 从旧版升级远程 HTTPS 实例时，先补充 `TRUSTED_PROXIES`；缺少该配置会拒绝启动。数据库与便携备份格式保持版本 1，现有主密码、恢复密钥及备份继续有效。更新后刷新所有已打开的标签页，以加载新的锁定逻辑。
 
-先在界面导出一份加密备份。使用 Docker Hub 镜像时，将 `.env` 的 `IMAGE` 更新为目标版本，再执行：
+先在界面导出一份加密备份。使用 Docker Hub 的 `latest` 镜像时，无需修改版本号，执行以下命令即可更新。服务启动时不会在后台自动更新；需要更新时运行命令：
 
 ```bash
 docker compose pull
@@ -134,11 +134,11 @@ docker compose up -d
 docker compose ps
 ```
 
-使用源码构建时，克隆或更新代码，在项目根目录运行以下命令。将 `.env` 的 `IMAGE` 设为 `keyfolio:local`，使后续启动继续使用本地镜像：
+使用源码构建时，克隆或更新代码，在项目根目录运行以下命令。将 `.env` 的 `IMAGE` 设为 `keyfolio:local`，后续启动保留 `--pull never`，使用本地镜像：
 
 ```bash
 docker build -t keyfolio:local .
-IMAGE=keyfolio:local docker compose up -d
+IMAGE=keyfolio:local docker compose up -d --pull never
 docker compose ps
 ```
 

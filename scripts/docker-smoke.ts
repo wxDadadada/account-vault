@@ -22,7 +22,7 @@ let origin = ''
 async function ready() {
   // Docker may allocate a different ephemeral host port after a restart.
   const mapping = JSON.parse(docker('inspect', name))[0].NetworkSettings.Ports[
-    '4318/tcp'
+    '8188/tcp'
   ]?.[0]
   if (mapping) origin = `http://127.0.0.1:${mapping.HostPort}`
   for (let attempt = 0; attempt < 60; attempt++) {
@@ -48,7 +48,7 @@ async function request(
     headers: {
       'content-type': 'application/json',
       'x-keyfolio': '1',
-      origin: 'http://localhost:4318',
+      origin: 'http://localhost:8188',
       ...(cookie ? { cookie } : {}),
     },
     ...(payload !== undefined ? { body: JSON.stringify(payload) } : {}),
@@ -78,15 +78,15 @@ try {
     '--tmpfs',
     '/tmp:size=16m,mode=1777',
     '-p',
-    '127.0.0.1::4318',
+    '127.0.0.1::8188',
     '-v',
     `${volume}:/app/data`,
     '-e',
-    'APP_ORIGIN=http://localhost:4318',
+    'APP_ORIGIN=http://localhost:8188',
     image
   )
   const binding = JSON.parse(docker('inspect', name))[0].NetworkSettings.Ports[
-    '4318/tcp'
+    '8188/tcp'
   ][0]
   origin = `http://127.0.0.1:${binding.HostPort}`
   await ready()
