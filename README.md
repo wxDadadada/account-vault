@@ -28,13 +28,11 @@
 
 完整用法和兼容边界见 [账号库日常管理增强](docs/collection-enhancement.md)。
 
-## 最快启动：Docker
+## 最快启动：宝塔 + Docker
 
-需要 Docker 和 Docker Compose。
+适用于宝塔与 Docker 在同一台 Linux 服务器。源码仓库：[wxDadadada/account-vault](https://github.com/wxDadadada/account-vault)。镜像仓库：[wxdadadada/account-vault](https://hub.docker.com/r/wxdadadada/account-vault)，支持 `linux/amd64` 和 `linux/arm64`。
 
-源码仓库：[wxDadadada/account-vault](https://github.com/wxDadadada/account-vault)。镜像仓库：[wxdadadada/account-vault](https://hub.docker.com/r/wxdadadada/account-vault)，提供 `linux/amd64` 和 `linux/arm64`，默认使用 `latest`，每次启动都会检查最新镜像。后续更新直接执行 `docker compose up -d`，无需修改版本号。
-
-只需下载 `docker-compose.yml`，默认使用发布镜像，无需源码或 `.env`：
+只需一份 `docker-compose.yml`，域名、端口、代理和 `latest` 镜像都已写入文件，无需 `.env`：
 
 ```bash
 mkdir -p account-vault
@@ -43,24 +41,19 @@ curl -fsSL https://raw.githubusercontent.com/wxDadadada/account-vault/main/docke
 docker compose up -d
 ```
 
-需要从源码构建时，在克隆后的项目根目录执行以下命令，并将可选 `.env` 中的 `IMAGE` 设为 `keyfolio:local`，供后续启动使用。本地镜像启动时保留 `--pull never`：
+文件已配置域名 **https://account.wxda.cc**；更换域名时修改其中的 `APP_ORIGIN`。宝塔启用 HTTPS，反向代理目标填写 **http://127.0.0.1:8188**。应用仅监听本机回环地址，可信代理已配置，无需查询 Docker 网关。
+
+首次创建需要读取初始化令牌：
 
 ```bash
-docker build -t keyfolio:local .
-IMAGE=keyfolio:local docker compose up -d --pull never
+docker compose exec app cat /app/data/setup-token
 ```
 
-浏览器打开 **http://localhost:8188**。首次创建用户名和至少 12 个字符的主密码，保存恢复密钥，即可使用。
+在网页填写令牌、用户名和至少 12 个字符的主密码，并保存恢复密钥。已有账号库无需重新初始化。
 
-SQLite、双重验证服务密钥和自动快照持久保存在 `keyfolio_data` 命名卷中。平时使用 `docker compose down` 可保留数据；**不要加 `-v`，它会删除数据卷**。
+以后修改配置或更新镜像，只需执行 `docker compose up -d`。Compose 会检查最新镜像并按需重建容器，无需修改版本号。SQLite、双重验证服务密钥和自动快照持久保存在 `keyfolio_data` 命名卷中，升级时保持原项目名和数据卷。平时 `docker compose down` 会保留数据，`down -v` 会删除数据卷。
 
-```bash
-docker compose ps
-docker compose logs --tail=50 app
-docker compose restart app
-```
-
-远程访问需要配置域名、HTTPS、可信代理 `TRUSTED_PROXIES` 和服务器初始化令牌；旧版远程实例升级前也需补充可信代理配置，见 [部署与恢复](docs/deployment.md)。
+**本机 Docker / Docker Desktop** 使用 [docker-compose.local.yml](docker-compose.local.yml)，运行 `docker compose -f docker-compose.local.yml up -d` 后访问 **http://localhost:8188**。详细配置、源码构建和备份恢复见 [部署与恢复](docs/deployment.md)。
 
 ## 本地开发
 
@@ -72,7 +65,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-前端为 **http://127.0.0.1:5188**，开发 API 为 `127.0.0.1:8188`。Node 服务、Docker 容器内部与宿主机映射的默认端口统一为 `8188`；开发 API 与 Docker 同时运行时需另选宿主端口。开发数据目录为项目内 `data/`，与 Docker 命名卷是两套独立存储。
+前端为 **http://127.0.0.1:5188**，开发 API 为 `127.0.0.1:8188`。Node 服务与 Docker 的默认端口统一为 `8188`；开发 API 与本机 Docker 同时运行时需另选宿主映射端口。开发数据目录为项目内 `data/`，与 Docker 命名卷是两套独立存储。
 
 本地生产运行：
 

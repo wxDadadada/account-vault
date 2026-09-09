@@ -1,18 +1,21 @@
-# 独立部署：保存本文件后执行 docker compose up -d。
-# 远程访问：配置 APP_ORIGIN、TRUSTED_PROXIES，并用 HTTPS 反向代理连接本机 8188 端口。
+# 宝塔与 Docker 同机的 Linux 部署：保存本文件后执行 docker compose up -d。
+# 宝塔 HTTPS 反向代理目标：http://127.0.0.1:8188。
+# 所有部署配置直接修改本文件，无需 .env；更换域名时修改 APP_ORIGIN。
 name: account-vault
 
 services:
   app:
-    image: ${IMAGE:-wxdadadada/account-vault:latest}
+    image: wxdadadada/account-vault:latest
     pull_policy: always
     restart: unless-stopped
-    ports:
-      - '127.0.0.1:${PORT:-8188}:8188'
+    # 共用宿主网络，让宝塔的直连来源固定为回环地址，无需查询 Docker 网关。
+    network_mode: host
     environment:
-      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8188}
-      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
-      AI_ALLOWED_HOSTS: ${AI_ALLOWED_HOSTS:-api.deepseek.com,api.openai.com,api.moonshot.cn,api.moonshot.ai,dashscope.aliyuncs.com,openrouter.ai}
+      HOST: 127.0.0.1
+      PORT: '8188'
+      APP_ORIGIN: https://account.wxda.cc
+      TRUSTED_PROXIES: 127.0.0.1,::1
+      AI_ALLOWED_HOSTS: api.deepseek.com,api.openai.com,api.moonshot.cn,api.moonshot.ai,dashscope.aliyuncs.com,openrouter.ai
     volumes:
       - keyfolio_data:/app/data
     security_opt:

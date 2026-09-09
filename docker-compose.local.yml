@@ -1,0 +1,32 @@
+# 本机 Docker / Docker Desktop：docker compose -f docker-compose.local.yml up -d。
+# 默认访问 http://localhost:8188；宝塔服务器部署使用 docker-compose.yml。
+name: account-vault
+
+services:
+  app:
+    image: ${IMAGE:-wxdadadada/account-vault:latest}
+    pull_policy: always
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${PORT:-8188}:8188'
+    environment:
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8188}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
+      AI_ALLOWED_HOSTS: ${AI_ALLOWED_HOSTS:-api.deepseek.com,api.openai.com,api.moonshot.cn,api.moonshot.ai,dashscope.aliyuncs.com,openrouter.ai}
+    volumes:
+      - keyfolio_data:/app/data
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    logging:
+      driver: json-file
+      options:
+        max-size: '5m'
+        max-file: '2'
+
+volumes:
+  keyfolio_data:
