@@ -3,6 +3,7 @@
 @import './theme.css';
 @import './vault.css';
 @import './collection.css';
+@import './workspace.css';
 @custom-variant dark (&:is(.dark *));
 @layer base {
   * {

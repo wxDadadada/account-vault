@@ -60,7 +60,7 @@ export function SubjectsPage({
     a.localeCompare(b, 'zh-CN')
   )
   return (
-    <>
+    <div className='taxonomy-page'>
       <PageHeading title='主体与分类' subtitle='每个身份，都有清晰的归属。'>
         {tab !== 'tags' && (
           <Button
@@ -106,218 +106,230 @@ export function SubjectsPage({
           ))}
         </div>
       </div>
-      {tab === 'subjects' && (
-        <div className='subject-toolbar'>
-          <TextField
-            label='搜索主体'
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder='搜索名称或别名'
-          />
-          <div className='collection-display'>
-            <Button
-              variant='ghost'
-              size='icon'
-              aria-label='主体卡片视图'
-              aria-pressed={view === 'grid'}
-              onClick={() => setView('grid')}
-            >
-              <Grid2X2 size={18} />
-            </Button>
-            <Button
-              variant='ghost'
-              size='icon'
-              aria-label='主体列表视图'
-              aria-pressed={view === 'list'}
-              onClick={() => setView('list')}
-            >
-              <LayoutList size={18} />
-            </Button>
+      <div className='taxonomy-content'>
+        {tab === 'subjects' && (
+          <div className='subject-toolbar'>
+            <TextField
+              label='搜索主体'
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder='搜索名称或别名'
+            />
+            <div className='collection-display'>
+              <Button
+                variant='ghost'
+                size='icon'
+                aria-label='主体卡片视图'
+                aria-pressed={view === 'grid'}
+                onClick={() => setView('grid')}
+              >
+                <Grid2X2 size={18} />
+              </Button>
+              <Button
+                variant='ghost'
+                size='icon'
+                aria-label='主体列表视图'
+                aria-pressed={view === 'list'}
+                onClick={() => setView('list')}
+              >
+                <LayoutList size={18} />
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
-      {tab === 'subjects' && (
-        <div
-          className={
-            'subject-grid' + (view === 'list' ? ' subject-compact' : '')
-          }
-        >
-          {data.subjects
-            .filter((s) =>
+        )}
+        {tab === 'subjects' && (
+          <div
+            className={
+              'subject-grid' + (view === 'list' ? ' subject-compact' : '')
+            }
+          >
+            {data.subjects
+              .filter((s) =>
+                (s.name + ' ' + s.aliases.join(' '))
+                  .toLowerCase()
+                  .includes(query.toLowerCase())
+              )
+              .map((s) => (
+                <article className='subject-card' key={s.id}>
+                  <div className='subject-card-top'>
+                    <span className={`subject-emblem ${s.color}`}>
+                      {s.type === 'personal' ? <UserRound /> : <Building2 />}
+                    </span>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          size='icon'
+                          variant='ghost'
+                          aria-label={`管理 ${s.name}`}
+                        >
+                          <Ellipsis size={20} />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align='end'>
+                        <DropdownMenuItem onClick={() => setEditor(s)}>
+                          <Pencil size={15} />
+                          编辑主体
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className='text-destructive'
+                          onClick={() =>
+                            setConfirmation({
+                              title: `删除「${s.name}」？`,
+                              description:
+                                '仅未关联账号或历史记录的主体可以删除。',
+                              label: '删除主体',
+                              danger: true,
+                              action: async () => {
+                                await commit((d) => deleteSubject(d, s.id))
+                                toast.success('主体已删除')
+                              },
+                            })
+                          }
+                        >
+                          <Trash2 size={15} />
+                          删除主体
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <Button
+                    variant='ghost'
+                    type='button'
+                    className='subject-card-main'
+                    onClick={() => onSelect(s.id)}
+                  >
+                    <h2>{s.name}</h2>
+                    <p>
+                      {s.type === 'personal' ? '个人主体' : '企业 / 工作室'}
+                    </p>
+                    <div className='subject-aliases'>
+                      {s.aliases.length
+                        ? s.aliases.join(' · ')
+                        : '可添加别名，方便自然语言识别'}
+                    </div>
+                    <div className='subject-account-count'>
+                      <strong>
+                        {
+                          data.accounts.filter((a) => a.subjectId === s.id)
+                            .length
+                        }
+                      </strong>
+                      <span>个账号</span>
+                      <ArrowRight size={18} />
+                    </div>
+                  </Button>
+                </article>
+              ))}
+            {!data.subjects.filter((s) =>
               (s.name + ' ' + s.aliases.join(' '))
                 .toLowerCase()
                 .includes(query.toLowerCase())
-            )
-            .map((s) => (
-              <article className='subject-card' key={s.id}>
-                <div className='subject-card-top'>
-                  <span className={`subject-emblem ${s.color}`}>
-                    {s.type === 'personal' ? <UserRound /> : <Building2 />}
+            ).length && (
+              <EmptyState
+                title={query ? '没有匹配的主体' : '给账号一个归属'}
+                text={
+                  query
+                    ? '试试名称或其他别名。'
+                    : '添加个人、公司或工作室主体。'
+                }
+              />
+            )}
+          </div>
+        )}
+        {tab === 'categories' && (
+          <div className='management-list'>
+            {data.categories.map((c) => {
+              const count = data.accounts.filter((a) => a.category === c).length
+              return (
+                <div className='management-row' key={c}>
+                  <span className='management-icon'>
+                    <FolderOpen size={19} />
                   </span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        size='icon'
-                        variant='ghost'
-                        aria-label={`管理 ${s.name}`}
-                      >
-                        <Ellipsis size={20} />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align='end'>
-                      <DropdownMenuItem onClick={() => setEditor(s)}>
-                        <Pencil size={15} />
-                        编辑主体
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className='text-destructive'
-                        onClick={() =>
-                          setConfirmation({
-                            title: `删除「${s.name}」？`,
-                            description:
-                              '仅未关联账号或历史记录的主体可以删除。',
-                            label: '删除主体',
-                            danger: true,
-                            action: async () => {
-                              await commit((d) => deleteSubject(d, s.id))
-                              toast.success('主体已删除')
-                            },
+                  <div>
+                    <strong>{c}</strong>
+                    <span>{count} 个账号</span>
+                  </div>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    aria-label={`重命名分类 ${c}`}
+                    onClick={() => setCategory(c)}
+                  >
+                    <Pencil size={16} />
+                  </Button>
+                  <Button
+                    variant='ghost'
+                    size='icon'
+                    className='danger-ghost'
+                    aria-label={`删除分类 ${c}`}
+                    disabled={count > 0 || c === '其他'}
+                    onClick={() =>
+                      setConfirmation({
+                        title: `删除「${c}」分类？`,
+                        description: '这个分类当前没有关联账号。',
+                        label: '删除分类',
+                        danger: true,
+                        action: async () => {
+                          await commit((d) => {
+                            if (d.accounts.some((a) => a.category === c))
+                              throw new Error('分类已被使用')
+                            d.categories = d.categories.filter((n) => n !== c)
+                            return d
                           })
-                        }
-                      >
-                        <Trash2 size={15} />
-                        删除主体
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                          toast.success('分类已删除')
+                        },
+                      })
+                    }
+                  >
+                    <Trash2 size={16} />
+                  </Button>
                 </div>
+              )
+            })}
+          </div>
+        )}
+        {tab === 'tags' &&
+          (tags.length ? (
+            <div className='tag-cloud'>
+              {tags.map((t) => (
                 <Button
                   variant='ghost'
                   type='button'
-                  className='subject-card-main'
-                  onClick={() => onSelect(s.id)}
+                  key={t}
+                  onClick={() => onTag(t)}
                 >
-                  <h2>{s.name}</h2>
-                  <p>{s.type === 'personal' ? '个人主体' : '企业 / 工作室'}</p>
-                  <div className='subject-aliases'>
-                    {s.aliases.length
-                      ? s.aliases.join(' · ')
-                      : '可添加别名，方便自然语言识别'}
-                  </div>
-                  <div className='subject-account-count'>
-                    <strong>
-                      {data.accounts.filter((a) => a.subjectId === s.id).length}
-                    </strong>
-                    <span>个账号</span>
-                    <ArrowRight size={18} />
-                  </div>
+                  <Tag size={16} />
+                  <strong>{t}</strong>
+                  <span>
+                    {data.accounts.filter((a) => a.tags.includes(t)).length}
+                  </span>
+                  <ArrowRight size={15} />
                 </Button>
-              </article>
-            ))}
-          {!data.subjects.filter((s) =>
-            (s.name + ' ' + s.aliases.join(' '))
-              .toLowerCase()
-              .includes(query.toLowerCase())
-          ).length && (
+              ))}
+            </div>
+          ) : (
             <EmptyState
-              title={query ? '没有匹配的主体' : '给账号一个归属'}
-              text={
-                query ? '试试名称或其他别名。' : '添加个人、公司或工作室主体。'
-              }
+              title='标签会在这里汇集'
+              text='编辑账号时添加项目或用途标签，即可快速归类。'
             />
-          )}
-        </div>
-      )}
-      {tab === 'categories' && (
-        <div className='management-list'>
-          {data.categories.map((c) => {
-            const count = data.accounts.filter((a) => a.category === c).length
-            return (
-              <div className='management-row' key={c}>
-                <span className='management-icon'>
-                  <FolderOpen size={19} />
-                </span>
-                <div>
-                  <strong>{c}</strong>
-                  <span>{count} 个账号</span>
-                </div>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  aria-label={`重命名分类 ${c}`}
-                  onClick={() => setCategory(c)}
-                >
-                  <Pencil size={16} />
-                </Button>
-                <Button
-                  variant='ghost'
-                  size='icon'
-                  className='danger-ghost'
-                  aria-label={`删除分类 ${c}`}
-                  disabled={count > 0 || c === '其他'}
-                  onClick={() =>
-                    setConfirmation({
-                      title: `删除「${c}」分类？`,
-                      description: '这个分类当前没有关联账号。',
-                      label: '删除分类',
-                      danger: true,
-                      action: async () => {
-                        await commit((d) => {
-                          if (d.accounts.some((a) => a.category === c))
-                            throw new Error('分类已被使用')
-                          d.categories = d.categories.filter((n) => n !== c)
-                          return d
-                        })
-                        toast.success('分类已删除')
-                      },
-                    })
-                  }
-                >
-                  <Trash2 size={16} />
-                </Button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-      {tab === 'tags' &&
-        (tags.length ? (
-          <div className='tag-cloud'>
-            {tags.map((t) => (
-              <Button
-                variant='ghost'
-                type='button'
-                key={t}
-                onClick={() => onTag(t)}
-              >
-                <Tag size={16} />
-                <strong>{t}</strong>
-                <span>
-                  {data.accounts.filter((a) => a.tags.includes(t)).length}
-                </span>
-                <ArrowRight size={15} />
-              </Button>
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title='标签会在这里汇集'
-            text='编辑账号时添加项目或用途标签，即可快速归类。'
+          ))}
+        {editor !== undefined && (
+          <SubjectEditor
+            initial={editor}
+            onClose={() => setEditor(undefined)}
           />
-        ))}
-      {editor !== undefined && (
-        <SubjectEditor initial={editor} onClose={() => setEditor(undefined)} />
-      )}
-      {category !== undefined && (
-        <CategoryEditor
-          initial={category}
-          onClose={() => setCategory(undefined)}
-        />
-      )}
-      {confirmation && (
-        <Confirm value={confirmation} onClose={() => setConfirmation(null)} />
-      )}
-    </>
+        )}
+        {category !== undefined && (
+          <CategoryEditor
+            initial={category}
+            onClose={() => setCategory(undefined)}
+          />
+        )}
+        {confirmation && (
+          <Confirm value={confirmation} onClose={() => setConfirmation(null)} />
+        )}
+      </div>
+    </div>
   )
 }
 function SubjectEditor({

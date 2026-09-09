@@ -1,20 +1,6 @@
-import { Fragment, lazy, Suspense, useEffect, useState } from 'react'
-import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import {
-  Building2,
-  ChevronRight,
-  CircleHelp,
-  History,
-  KeyRound,
-  LockKeyhole,
-  LogOut,
-  Plus,
-  RefreshCw,
-  Settings2,
-  ShieldCheck,
-  Sparkles,
-  UserRound,
-} from 'lucide-react'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { useNavigate, useRouterState } from '@tanstack/react-router'
+import { History, KeyRound, Sparkles } from 'lucide-react'
 import { Toaster, toast } from 'sonner'
 import { useTheme } from '@/context/theme-provider'
 import { Button } from '@/components/ui/button'
@@ -26,7 +12,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Confirm, type Confirmation } from './components/Confirm'
-import { Brand, Busy } from './components/ui'
+import { WorkspaceHeader } from './components/WorkspaceHeader'
+import { Busy } from './components/ui'
 import { deleteAccount, saveAccount } from './lib/domain'
 import { type Account, type Change } from './lib/model'
 import { registerCaptureTool, type ModelContext } from './lib/webmcp'
@@ -34,12 +21,6 @@ import { Accounts } from './pages/Accounts'
 import { AuthScreen, RecoveryDialog } from './pages/Auth'
 import { useVault } from './state/context'
 
-const nav = [
-  { to: '/', name: '账号库', icon: KeyRound },
-  { to: '/subjects', name: '主体与分类', icon: Building2 },
-  { to: '/history', name: '变更记录', icon: History },
-  { to: '/settings', name: '设置', icon: Settings2 },
-]
 const AccountEditor = lazy(() =>
   import('./components/AccountEditor').then((m) => ({
     default: m.AccountEditor,
@@ -95,8 +76,10 @@ function UnlockedApp() {
     select: (state) => state.location.pathname,
   })
   const navigate = useNavigate()
-  const currentNav = nav.find((n) => n.to === pathname) || nav[0]
   const selected = data?.accounts.find((a) => a.id === selectedId)
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pathname])
   useEffect(() => {
     try {
       return registerCaptureTool(
@@ -172,169 +155,18 @@ function UnlockedApp() {
       <a className='skip-link' href='#main'>
         跳转到主要内容
       </a>
-      <aside className='desktop-sidebar'>
-        <Brand />
-        <div className='workspace-switch'>
-          <span className='workspace-avatar'>
-            {demo ? 'K' : vault.profile?.username.slice(0, 1).toUpperCase()}
-          </span>
-          <div>
-            <strong>我的账号空间</strong>
-            <span>{demo ? '示例保险库' : '个人保险库'}</span>
-          </div>
-          <ShieldCheck size={17} />
-        </div>
-        <span className='nav-caption'>工作空间</span>
-        <nav>
-          {nav.map((n) => (
-            <Button variant='ghost' asChild key={n.to}>
-              <Link
-                to={n.to}
-                className={`nav-item ${pathname === n.to ? 'active' : ''}`}
-                aria-current={pathname === n.to ? 'page' : undefined}
-              >
-                <n.icon size={19} />
-                <span>{n.name}</span>
-                {n.to === '/' && (
-                  <span className='nav-count'>{data.accounts.length}</span>
-                )}
-              </Link>
-            </Button>
-          ))}
-        </nav>
-        <div className='sidebar-subjects'>
-          <span className='nav-caption'>
-            我的主体 <Building2 size={14} />
-          </span>
-          {data.subjects.map((s) => (
-            <Button
-              variant='ghost'
-              type='button'
-              key={s.id}
-              className={`subject-nav ${subject === s.id ? 'chosen' : ''}`}
-              onClick={() => filterSubject(subject === s.id ? 'all' : s.id)}
-            >
-              <span className={`subject-dot ${s.color}`} />
-              <span>{s.name}</span>
-              <small>
-                {data.accounts.filter((a) => a.subjectId === s.id).length}
-              </small>
-            </Button>
-          ))}
-        </div>
-        <div className='sidebar-bottom'>
-          <Button
-            variant='ghost'
-            className='sidebar-capture'
-            onClick={() => setComposer({ mode: 'capture' })}
-          >
-            <Sparkles size={18} />
-            <span>随手记一条</span>
-            <Plus size={16} />
-          </Button>
-          <div className='vault-status'>
-            <ShieldCheck size={18} />
-            <div>
-              <strong>{demo ? '正在体验示例空间' : '账号库已解锁'}</strong>
-              <span>
-                {demo
-                  ? '演示数据 · 不会保存'
-                  : `闲置 ${data.preferences.autoLockMinutes} 分钟后自动锁定`}
-              </span>
-            </div>
-          </div>
-          <Button
-            variant='ghost'
-            type='button'
-            className='profile-button'
-            onClick={askExit}
-          >
-            <span className='profile-avatar'>
-              <UserRound size={20} />
-            </span>
-            <div>
-              <strong>{demo ? '退出体验' : vault.profile?.username}</strong>
-              <span>{demo ? '创建自己的账号空间' : '退出登录并锁定'}</span>
-            </div>
-            {demo ? <LogOut size={17} /> : <LockKeyhole size={17} />}
-          </Button>
-        </div>
-      </aside>
-      <div className='app-body'>
-        <header className='desktop-topbar'>
-          <span>
-            我的空间 <ChevronRight size={14} />{' '}
-            <strong>{currentNav.name}</strong>
-          </span>
-          <div>
-            <span className='demo-indicator'>
-              <span /> {demo ? '体验模式' : busy ? '加密保存中' : '已解锁'}
-            </span>
-            <Button
-              variant='ghost'
-              size='icon'
-              aria-label='同步最新内容'
-              title='同步最新内容'
-              disabled={busy}
-              onClick={() => void vault.sync().catch(notifyError)}
-            >
-              <RefreshCw size={17} />
-            </Button>
-            <Button
-              variant='ghost'
-              size='icon'
-              aria-label='使用说明'
-              onClick={() => setHelp(true)}
-            >
-              <CircleHelp size={18} />
-            </Button>
-            <Button
-              variant='ghost'
-              type='button'
-              className='mini-avatar'
-              aria-label='锁定账号库'
-              title='退出登录并锁定账号库'
-              onClick={askExit}
-            >
-              {demo ? 'K' : vault.profile?.username.slice(0, 1).toUpperCase()}
-            </Button>
-          </div>
-        </header>
-        <header className='mobile-topbar'>
-          <Brand />
-          <div className='mobile-top-actions'>
-            {demo ? (
-              <Button
-                variant='ghost'
-                type='button'
-                className='demo-mobile-pill'
-                onClick={askExit}
-              >
-                退出体验
-              </Button>
-            ) : (
-              <Button
-                variant='ghost'
-                size='icon'
-                aria-label='同步最新内容'
-                disabled={busy}
-                onClick={() => void vault.sync().catch(notifyError)}
-              >
-                <RefreshCw size={18} />
-              </Button>
-            )}
-            <Button
-              variant='ghost'
-              size='icon'
-              aria-label='锁定账号库'
-              title='退出登录并锁定账号库'
-              onClick={askExit}
-            >
-              <LockKeyhole size={21} />
-            </Button>
-          </div>
-        </header>
-        <main id='main' className='main-content'>
+      <WorkspaceHeader
+        pathname={pathname}
+        username={vault.profile?.username ?? ''}
+        demo={demo}
+        busy={busy}
+        onSync={() => void vault.sync().catch(notifyError)}
+        onHelp={() => setHelp(true)}
+        onLock={askExit}
+        onAdd={() => setEditing(null)}
+      />
+      <div className='workspace-body'>
+        <main id='main' className='workspace-content'>
           <Suspense
             fallback={
               <div className='loading-card'>
@@ -388,42 +220,6 @@ function UnlockedApp() {
           </Suspense>
         </main>
       </div>
-      <nav className='mobile-nav' aria-label='主要导航'>
-        {nav.map((n, index) => (
-          <Fragment key={n.to}>
-            {index === 2 && (
-              <Button
-                variant='ghost'
-                type='button'
-                className='mobile-create'
-                aria-label='添加账号'
-                onClick={() => setEditing(null)}
-              >
-                <span className='mobile-create-icon'>
-                  <Plus size={22} />
-                </span>
-                <span>新增</span>
-              </Button>
-            )}
-            <Button variant='ghost' asChild>
-              <Link
-                to={n.to}
-                className={pathname === n.to ? 'active' : ''}
-                aria-current={pathname === n.to ? 'page' : undefined}
-              >
-                <n.icon size={22} strokeWidth={1.8} />
-                <span>
-                  {n.to === '/history'
-                    ? '动态'
-                    : n.to === '/subjects'
-                      ? '主体'
-                      : n.name}
-                </span>
-              </Link>
-            </Button>
-          </Fragment>
-        ))}
-      </nav>
       <Suspense fallback={null}>
         {selected && (
           <AccountDetail

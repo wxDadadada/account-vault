@@ -15,7 +15,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --prod --frozen-lockfile
 
 FROM node:22-bookworm-slim AS runtime
-ARG VERSION=0.1.2
+ARG VERSION=0.2.0
 ARG REVISION=unknown
 LABEL org.opencontainers.image.title="Keyfolio" \
       org.opencontainers.image.description="Self-hosted encrypted account manager" \

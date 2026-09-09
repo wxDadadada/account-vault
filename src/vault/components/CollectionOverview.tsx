@@ -1,103 +1,141 @@
 import {
   ArrowRight,
-  ArrowUpRight,
-  KeyRound,
+  Building2,
+  FolderOpen,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { type VaultData } from '../lib/model'
 
 export function CollectionOverview({
-  accounts,
-  subjects,
-  favorites,
+  data,
+  subject,
+  setSubject,
   warnings,
-  captureText,
-  setCaptureText,
-  onCapture,
   onHealth,
 }: {
-  accounts: number
-  subjects: number
-  favorites: number
+  data: VaultData
+  subject: string
+  setSubject: (id: string) => void
   warnings: number
-  captureText: string
-  setCaptureText: (text: string) => void
-  onCapture: () => void
   onHealth: () => void
 }) {
   return (
-    <div className='collection-overview'>
-      <form
-        className='capture-studio'
-        onSubmit={(e) => {
-          e.preventDefault()
-          onCapture()
-        }}
+    <aside className='library-sidebar' aria-label='账号归档'>
+      <div className='library-sidebar-title'>
+        <FolderOpen size={18} />
+        <strong>我的空间</strong>
+      </div>
+      <Button
+        variant='ghost'
+        className='library-folder'
+        aria-pressed={subject === 'all'}
+        onClick={() => setSubject('all')}
       >
-        <div className='capture-studio-copy'>
-          <span className='studio-label'>
-            <Sparkles size={15} /> 拾钥整理助手
-          </span>
-          <h2>新账号，随手记下来。</h2>
-          <p>告诉我平台和账号，帮你整理、归档。</p>
-        </div>
-        <div className='studio-art' aria-hidden='true'>
-          <span className='studio-card-back' />
-          <span className='studio-card-front'>
-            <KeyRound size={26} strokeWidth={1.4} />
-            <i />
-            <i />
-          </span>
-          <span className='studio-spark'>
-            <Sparkles size={15} />
-          </span>
-        </div>
-        <div className='studio-input'>
-          <Input
-            aria-label='快速记录描述'
-            value={captureText}
-            onChange={(e) => setCaptureText(e.target.value)}
-            maxLength={6000}
-            placeholder='平台、账号和用途，密码在下一步填写'
-          />
-          <Button type='submit'>
-            开始记录 <ArrowUpRight size={16} />
+        <span>全部主体</span>
+        <small>{data.accounts.length}</small>
+      </Button>
+      <div className='library-section-label'>
+        <span>按主体查看</span>
+        <Building2 size={13} />
+      </div>
+      <div className='library-folders'>
+        {data.subjects.map((item) => (
+          <Button
+            key={item.id}
+            variant='ghost'
+            className='library-folder'
+            aria-pressed={subject === item.id}
+            onClick={() => setSubject(subject === item.id ? 'all' : item.id)}
+          >
+            <span className={`subject-dot ${item.color}`} />
+            <span>{item.name}</span>
+            <small>
+              {
+                data.accounts.filter((account) => account.subjectId === item.id)
+                  .length
+              }
+            </small>
           </Button>
-        </div>
-      </form>
-      <section className='space-ledger' aria-label='账号概览'>
-        <div className='space-ledger-top'>
-          <span>我的数字空间</span>
-          <KeyRound size={17} />
-        </div>
-        <div className='space-ledger-numbers'>
-          <div className='ledger-total'>
-            <strong>{String(accounts).padStart(2, '0')}</strong>
-            <span>个账号</span>
-          </div>
-          <div className='ledger-detail'>
-            <span>
-              <b>{subjects}</b> 个主体
-            </span>
-            <span>
-              <b>{favorites}</b> 个收藏
-            </span>
-          </div>
-        </div>
+        ))}
         <Button
           variant='ghost'
-          className='ledger-health'
+          className='library-folder'
+          aria-pressed={subject === ''}
+          onClick={() => setSubject(subject === '' ? 'all' : '')}
+        >
+          <span className='subject-dot' />
+          <span>未分配主体</span>
+          <small>
+            {data.accounts.filter((account) => !account.subjectId).length}
+          </small>
+        </Button>
+      </div>
+      <div className='library-health'>
+        <ShieldCheck size={21} />
+        <strong>整理好，也照看好。</strong>
+        <p>
+          {warnings
+            ? `${warnings} 个账号有待查看事项`
+            : '目前没有待处理的账号事项'}
+        </p>
+        <Button
+          variant='ghost'
           onClick={onHealth}
           aria-label={`账号检查 ${warnings}`}
         >
-          <ShieldCheck size={17} />
-          <span>账号检查</span>
-          <small>{warnings ? `${warnings} 项待查看` : '状态良好'}</small>
+          账号检查
           <ArrowRight size={15} />
         </Button>
-      </section>
-    </div>
+      </div>
+      <dl className='library-summary' aria-label='账号概览'>
+        <div>
+          <dt>主体</dt>
+          <dd>{data.subjects.length}</dd>
+        </div>
+        <div>
+          <dt>收藏</dt>
+          <dd>{data.accounts.filter((account) => account.favorite).length}</dd>
+        </div>
+      </dl>
+    </aside>
+  )
+}
+
+export function QuickCapture({
+  captureText,
+  setCaptureText,
+  onCapture,
+}: {
+  captureText: string
+  setCaptureText: (value: string) => void
+  onCapture: () => void
+}) {
+  return (
+    <form
+      className='quick-capture'
+      onSubmit={(event) => {
+        event.preventDefault()
+        onCapture()
+      }}
+    >
+      <span className='quick-capture-label'>
+        <Sparkles size={17} />
+        <strong>随手记</strong>
+      </span>
+      <Input
+        aria-label='快速记录描述'
+        value={captureText}
+        onChange={(event) => setCaptureText(event.target.value)}
+        maxLength={6000}
+        placeholder='告诉我平台、账号和用途，密码在下一步填写'
+      />
+      <Button type='submit' variant='ghost'>
+        开始记录
+        <ArrowRight size={16} />
+      </Button>
+    </form>
   )
 }

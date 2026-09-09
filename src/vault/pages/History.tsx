@@ -115,8 +115,17 @@ export function HistoryPage({
     delete: '删除账号',
     restore: '恢复版本',
   }
+  const days = new Map<string, Change[]>()
+  for (const change of changes) {
+    const day = new Date(change.at).toLocaleDateString('zh-CN', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    })
+    days.set(day, [...(days.get(day) ?? []), change])
+  }
   return (
-    <>
+    <div className='history-page'>
       <PageHeading title='变更记录' subtitle='每一次变化，都在这里。' />
       <div className='search-toolbar'>
         <div className='search-field'>
@@ -146,44 +155,56 @@ export function HistoryPage({
         <span>每个账号保留最近 {data.preferences.historyLimit} 条</span>
       </div>
       {changes.length ? (
-        <div className='timeline-panel'>
-          {changes.map((c) => (
-            <div className='timeline-item' key={c.id}>
-              <Button
-                variant='ghost'
-                type='button'
-                className='timeline-row'
-                onClick={() => setExpanded(expanded === c.id ? null : c.id)}
-                aria-expanded={expanded === c.id}
-              >
-                <span className={`timeline-mark ${c.action}`}>
-                  <HistoryIcon size={18} />
-                </span>
-                <div>
-                  <h2>
-                    {c.platform}
-                    <span>{names[c.action]}</span>
-                  </h2>
-                  <p>
-                    {c.source === 'ai'
-                      ? 'AI 录入'
-                      : c.source === 'import'
-                        ? '备份导入'
-                        : '手动修改'}
-                    <span className='separator-dot'>·</span>
-                    {displayDate(c.at, true)}
-                  </p>
-                </div>
-                <span className='history-field-count'>
-                  {c.action === 'update'
-                    ? `${c.fields.length} 项变更`
-                    : '查看详情'}
-                </span>
-              </Button>
-              {expanded === c.id && (
-                <ChangeDiff change={c} onRestore={() => onRestore(c)} />
-              )}
-            </div>
+        <div className='history-days'>
+          {[...days].map(([day, entries]) => (
+            <section className='history-day' key={day}>
+              <h2 className='history-day-label'>
+                {day}
+                <span>{entries.length} 条</span>
+              </h2>
+              <div className='timeline-panel'>
+                {entries.map((c) => (
+                  <div className='timeline-item' key={c.id}>
+                    <Button
+                      variant='ghost'
+                      type='button'
+                      className='timeline-row'
+                      onClick={() =>
+                        setExpanded(expanded === c.id ? null : c.id)
+                      }
+                      aria-expanded={expanded === c.id}
+                    >
+                      <span className={`timeline-mark ${c.action}`}>
+                        <HistoryIcon size={18} />
+                      </span>
+                      <div>
+                        <h2>
+                          {c.platform}
+                          <span>{names[c.action]}</span>
+                        </h2>
+                        <p>
+                          {c.source === 'ai'
+                            ? 'AI 录入'
+                            : c.source === 'import'
+                              ? '备份导入'
+                              : '手动修改'}
+                          <span className='separator-dot'>·</span>
+                          {displayDate(c.at, true)}
+                        </p>
+                      </div>
+                      <span className='history-field-count'>
+                        {c.action === 'update'
+                          ? `${c.fields.length} 项变更`
+                          : '查看详情'}
+                      </span>
+                    </Button>
+                    {expanded === c.id && (
+                      <ChangeDiff change={c} onRestore={() => onRestore(c)} />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
           ))}
         </div>
       ) : (
@@ -192,6 +213,6 @@ export function HistoryPage({
           text='新增、修改或删除账号后，变更记录会自动出现。'
         />
       )}
-    </>
+    </div>
   )
 }

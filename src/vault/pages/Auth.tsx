@@ -84,301 +84,287 @@ export function AuthScreen() {
   }
   const disabled = working || vault.busy
   return (
-    <div className='auth-layout'>
-      <aside className='auth-story'>
+    <div className='entry-gate'>
+      <header className='entry-gate-header'>
         <Brand />
-        <div className='auth-story-content'>
-          <span className='auth-kicker'>YOUR DIGITAL LIFE, IN ORDER</span>
+        <span>
+          <ShieldCheck size={15} /> 由你保管的数字身份
+        </span>
+      </header>
+      <div className='entry-gate-body'>
+        <aside className='entry-intro'>
+          <span className='entry-intro-label'>一个只属于你的账号档案册</span>
           <h1>
-            把账号，
+            繁杂的账号，
             <br />
-            妥帖收好<span>。</span>
+            从此各有归处。
           </h1>
           <p>
-            个人、公司、项目。
+            从个人日常，到公司与项目。
             <br />
-            把分散的数字身份，整理在一处。
+            收好每一个身份，也记住每一次变化。
           </p>
-          <div className='auth-features'>
-            <span>
-              <Fingerprint size={20} /> 按主体归档
-            </span>
-            <span>
-              <History size={20} /> 留下每次变更
-            </span>
-            <span>
-              <Sparkles size={20} /> 说一句就记录
-            </span>
-          </div>
-        </div>
-        <div className='vault-object' aria-hidden='true'>
-          <div className='object-orbit' />
-          <div className='object-back-card'>
-            <span>PERSONAL</span>
-          </div>
-          <div className='object-middle-card'>
-            <span>WORK</span>
-          </div>
-          <div className='object-front-card'>
-            <div className='object-card-top'>
-              <KeyRound size={28} />
-              <span>KEYFOLIO / PRIVATE</span>
+          <div className='entry-index' aria-hidden='true'>
+            <div>
+              <span>01</span>
+              <Fingerprint size={19} />
+              <strong>个人</strong>
+              <small>生活里的每一个身份</small>
             </div>
-            <span className='object-card-title'>
-              Everything.
-              <br />
-              In its place.
-            </span>
-            <div className='object-card-bottom'>
-              <span className='object-chip' />
-              <LockKeyhole size={19} />
+            <div>
+              <span>02</span>
+              <History size={19} />
+              <strong>工作</strong>
+              <small>账号与变更，有迹可循</small>
+            </div>
+            <div>
+              <span>03</span>
+              <Sparkles size={19} />
+              <strong>项目</strong>
+              <small>说一句，整理到一起</small>
             </div>
           </div>
-          <div className='object-seal'>
-            <Check size={22} />
-          </div>
-        </div>
-        <div className='auth-story-footer'>
-          <ShieldCheck size={18} />
-          <span>浏览器端加密 · 自己掌握密钥</span>
-        </div>
-      </aside>
-      <section className='auth-main'>
-        <div className='auth-mobile-brand'>
-          <Brand />
-        </div>
-        {vault.phase === 'loading' ? (
-          <div className='auth-form'>
-            <Busy text='正在连接你的账号空间…' />
-          </div>
-        ) : vault.phase === 'error' ? (
-          <div className='auth-form'>
-            <span className='auth-icon'>
-              <LockKeyhole size={29} />
-            </span>
-            <h2>暂时无法连接账号库</h2>
-            <p>{vault.startupError}</p>
-            <Button
-              className='primary-button'
-              onClick={() => void vault.retry()}
-            >
-              重新连接
-            </Button>
-            <Button variant='ghost' onClick={vault.startDemo}>
-              先体验示例空间 <ArrowRight size={17} />
-            </Button>
-          </div>
-        ) : (
-          <form className='auth-form' onSubmit={submit}>
-            <div className='auth-form-kicker'>
-              <span className='auth-step'>01</span>
-              <span>
-                {recovery
-                  ? '恢复访问'
-                  : setup
-                    ? '开启你的账号空间'
-                    : '继续你的数字日常'}
+          <span className='entry-intro-foot'>
+            <LockKeyhole size={15} /> 浏览器端加密 · 自己掌握密钥
+          </span>
+        </aside>
+        <section className='entry-gate-form'>
+          {vault.phase === 'loading' ? (
+            <div className='auth-form'>
+              <Busy text='正在连接你的账号空间…' />
+            </div>
+          ) : vault.phase === 'error' ? (
+            <div className='auth-form'>
+              <span className='auth-icon'>
+                <LockKeyhole size={29} />
               </span>
-            </div>
-            <span className='auth-icon'>
-              {recovery ? <FileKey2 size={28} /> : <KeyRound size={28} />}
-            </span>
-            <h2>
-              {recovery
-                ? '找回你的账号空间'
-                : setup
-                  ? '创建你的私密空间'
-                  : '欢迎回来'}
-            </h2>
-            <p>
-              {recovery
-                ? '使用恢复密钥设置新的主密码。'
-                : setup
-                  ? '设置一个主密码，开始整理你的账号。'
-                  : '输入主密码，解锁你的账号与记录。'}
-            </p>
-            {recovery ? (
-              <TextField
-                label='恢复密钥'
-                value={recoveryInput}
-                onChange={(e) => setRecoveryInput(e.target.value)}
-                required
-                autoComplete='off'
-                spellCheck={false}
-                placeholder='创建空间时保存的恢复密钥'
-              />
-            ) : (
-              <TextField
-                label='用户名'
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                required
-                maxLength={64}
-                autoComplete='username'
-                autoCapitalize='none'
-              />
-            )}
-            {setup && vault.requiresSetupToken && (
-              <TextField
-                label='初始化令牌'
-                value={setupToken}
-                onChange={(e) => setSetupToken(e.target.value)}
-                required
-                autoComplete='off'
-                hint='在服务器执行 docker compose exec app cat /app/data/setup-token 获取。仅首次创建需要。'
-              />
-            )}
-            <PasswordField
-              label={recovery ? '新主密码' : '主密码'}
-              value={password}
-              onChange={setPassword}
-              required
-              minLength={setup || recovery ? 12 : undefined}
-              autoComplete={
-                setup || recovery ? 'new-password' : 'current-password'
-              }
-              placeholder={
-                setup || recovery ? '至少 12 个字符' : '输入你的主密码'
-              }
-            />
-            {(setup || recovery) && (
-              <PasswordField
-                label='再次输入主密码'
-                value={confirm}
-                onChange={setConfirm}
-                required
-              />
-            )}
-            {needOTP && !setup && !recovery && (
-              <TextField
-                label='验证器验证码'
-                value={otp}
-                onChange={(e) =>
-                  setOTP(e.target.value.replace(/\D/g, '').slice(0, 6))
-                }
-                inputMode='numeric'
-                autoComplete='one-time-code'
-                placeholder='6 位动态验证码'
-                required
-              />
-            )}
-            {setup && (
-              <Disclosure
-                className='restore-disclosure'
-                title={
-                  <>
-                    <FileKey2 size={16} /> 从加密备份恢复
-                  </>
-                }
-              >
-                <div className='restore-fields'>
-                  <BackupPicker
-                    filename={backupName}
-                    onFile={async (file) => {
-                      if (file.size > 12 * 1024 * 1024) {
-                        setError('备份文件超过 12 MB')
-                        return
-                      }
-                      setBackup(await file.text())
-                      setBackupName(file.name)
-                    }}
-                  />
-                  {backup && (
-                    <>
-                      <label className='checkbox-row'>
-                        <Checkbox
-                          checked={backupRecovery}
-                          onCheckedChange={(v) => setBackupRecovery(v === true)}
-                        />{' '}
-                        使用备份对应的恢复密钥
-                      </label>
-                      <PasswordField
-                        label={backupRecovery ? '备份恢复密钥' : '备份原主密码'}
-                        value={backupSecret}
-                        onChange={setBackupSecret}
-                        required
-                      />
-                    </>
-                  )}
-                </div>
-              </Disclosure>
-            )}
-            {recovery && (
-              <div className='inline-note'>
-                恢复后将退出所有设备、重置双重验证，并生成新的恢复密钥。
-              </div>
-            )}
-            {error && (
-              <div className='form-error' role='alert'>
-                {error}
-              </div>
-            )}
-            <Button
-              className='primary-button auth-submit'
-              disabled={disabled}
-              type='submit'
-            >
-              {disabled ? (
-                <Busy text={setup ? '正在创建加密空间…' : '正在解锁…'} />
-              ) : (
-                <>
-                  {recovery
-                    ? '恢复账号空间'
-                    : setup
-                      ? '创建账号空间'
-                      : '解锁账号库'}
-                  <ArrowRight size={18} />
-                </>
-              )}
-            </Button>
-            {!setup && (
+              <h2>暂时无法连接账号库</h2>
+              <p>{vault.startupError}</p>
               <Button
-                variant='ghost'
-                type='button'
-                disabled={disabled}
-                onClick={() => {
-                  setRecovery(!recovery)
-                  setError('')
-                  setPassword('')
-                  setConfirm('')
-                }}
+                className='primary-button'
+                onClick={() => void vault.retry()}
               >
-                {recovery ? (
-                  <>
-                    <ArrowLeft size={16} /> 返回登录
-                  </>
-                ) : (
-                  '忘记主密码？使用恢复密钥'
-                )}
+                重新连接
               </Button>
-            )}
-            {setup && (
-              <div className='auth-safe-note'>
-                <ShieldCheck size={15} />
+              <Button variant='ghost' onClick={vault.startDemo}>
+                先体验示例空间 <ArrowRight size={17} />
+              </Button>
+            </div>
+          ) : (
+            <form className='auth-form' onSubmit={submit}>
+              <div className='auth-form-kicker'>
                 <span>
-                  主密码用于在你的设备上解密。
-                  <br />
-                  创建后请保存恢复密钥。
+                  {recovery
+                    ? '恢复访问'
+                    : setup
+                      ? '开启你的账号空间'
+                      : '继续你的数字日常'}
                 </span>
               </div>
-            )}
-            <div className='auth-demo'>
-              <span>先看看是否适合你</span>
+              <span className='auth-icon'>
+                {recovery ? <FileKey2 size={28} /> : <KeyRound size={28} />}
+              </span>
+              <h2>
+                {recovery
+                  ? '找回你的账号空间'
+                  : setup
+                    ? '创建你的私密空间'
+                    : '欢迎回来'}
+              </h2>
+              <p>
+                {recovery
+                  ? '使用恢复密钥设置新的主密码。'
+                  : setup
+                    ? '设置一个主密码，开始整理你的账号。'
+                    : '输入主密码，解锁你的账号与记录。'}
+              </p>
+              {recovery ? (
+                <TextField
+                  label='恢复密钥'
+                  value={recoveryInput}
+                  onChange={(e) => setRecoveryInput(e.target.value)}
+                  required
+                  autoComplete='off'
+                  spellCheck={false}
+                  placeholder='创建空间时保存的恢复密钥'
+                />
+              ) : (
+                <TextField
+                  label='用户名'
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  required
+                  maxLength={64}
+                  autoComplete='username'
+                  autoCapitalize='none'
+                />
+              )}
+              {setup && vault.requiresSetupToken && (
+                <TextField
+                  label='初始化令牌'
+                  value={setupToken}
+                  onChange={(e) => setSetupToken(e.target.value)}
+                  required
+                  autoComplete='off'
+                  hint='在服务器执行 docker compose exec app cat /app/data/setup-token 获取。仅首次创建需要。'
+                />
+              )}
+              <PasswordField
+                label={recovery ? '新主密码' : '主密码'}
+                value={password}
+                onChange={setPassword}
+                required
+                minLength={setup || recovery ? 12 : undefined}
+                autoComplete={
+                  setup || recovery ? 'new-password' : 'current-password'
+                }
+                placeholder={
+                  setup || recovery ? '至少 12 个字符' : '输入你的主密码'
+                }
+              />
+              {(setup || recovery) && (
+                <PasswordField
+                  label='再次输入主密码'
+                  value={confirm}
+                  onChange={setConfirm}
+                  required
+                />
+              )}
+              {needOTP && !setup && !recovery && (
+                <TextField
+                  label='验证器验证码'
+                  value={otp}
+                  onChange={(e) =>
+                    setOTP(e.target.value.replace(/\D/g, '').slice(0, 6))
+                  }
+                  inputMode='numeric'
+                  autoComplete='one-time-code'
+                  placeholder='6 位动态验证码'
+                  required
+                />
+              )}
+              {setup && (
+                <Disclosure
+                  className='restore-disclosure'
+                  title={
+                    <>
+                      <FileKey2 size={16} /> 从加密备份恢复
+                    </>
+                  }
+                >
+                  <div className='restore-fields'>
+                    <BackupPicker
+                      filename={backupName}
+                      onFile={async (file) => {
+                        if (file.size > 12 * 1024 * 1024) {
+                          setError('备份文件超过 12 MB')
+                          return
+                        }
+                        setBackup(await file.text())
+                        setBackupName(file.name)
+                      }}
+                    />
+                    {backup && (
+                      <>
+                        <label className='checkbox-row'>
+                          <Checkbox
+                            checked={backupRecovery}
+                            onCheckedChange={(v) =>
+                              setBackupRecovery(v === true)
+                            }
+                          />{' '}
+                          使用备份对应的恢复密钥
+                        </label>
+                        <PasswordField
+                          label={
+                            backupRecovery ? '备份恢复密钥' : '备份原主密码'
+                          }
+                          value={backupSecret}
+                          onChange={setBackupSecret}
+                          required
+                        />
+                      </>
+                    )}
+                  </div>
+                </Disclosure>
+              )}
+              {recovery && (
+                <div className='inline-note'>
+                  恢复后将退出所有设备、重置双重验证，并生成新的恢复密钥。
+                </div>
+              )}
+              {error && (
+                <div className='form-error' role='alert'>
+                  {error}
+                </div>
+              )}
               <Button
-                variant='ghost'
-                type='button'
-                onClick={vault.startDemo}
+                className='primary-button auth-submit'
                 disabled={disabled}
+                type='submit'
               >
-                体验示例空间 <ArrowRight size={15} />
+                {disabled ? (
+                  <Busy text={setup ? '正在创建加密空间…' : '正在解锁…'} />
+                ) : (
+                  <>
+                    {recovery
+                      ? '恢复账号空间'
+                      : setup
+                        ? '创建账号空间'
+                        : '解锁账号库'}
+                    <ArrowRight size={18} />
+                  </>
+                )}
               </Button>
-            </div>
-          </form>
-        )}
-        <div className='auth-footer'>
-          拾钥 KEYFOLIO <span>·</span> 你的数字账号空间
-        </div>
-      </section>
+              {!setup && (
+                <Button
+                  variant='ghost'
+                  type='button'
+                  disabled={disabled}
+                  onClick={() => {
+                    setRecovery(!recovery)
+                    setError('')
+                    setPassword('')
+                    setConfirm('')
+                  }}
+                >
+                  {recovery ? (
+                    <>
+                      <ArrowLeft size={16} /> 返回登录
+                    </>
+                  ) : (
+                    '忘记主密码？使用恢复密钥'
+                  )}
+                </Button>
+              )}
+              {setup && (
+                <div className='auth-safe-note'>
+                  <ShieldCheck size={15} />
+                  <span>
+                    主密码用于在你的设备上解密。
+                    <br />
+                    创建后请保存恢复密钥。
+                  </span>
+                </div>
+              )}
+              <div className='auth-demo'>
+                <span>先看看是否适合你</span>
+                <Button
+                  variant='ghost'
+                  type='button'
+                  onClick={vault.startDemo}
+                  disabled={disabled}
+                >
+                  体验示例空间 <ArrowRight size={15} />
+                </Button>
+              </div>
+            </form>
+          )}
+          <div className='auth-footer'>
+            拾钥 KEYFOLIO <span>·</span> 你的数字账号空间
+          </div>
+        </section>
+      </div>
     </div>
   )
 }
