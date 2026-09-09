@@ -85,7 +85,7 @@ export const emptyVault = (): VaultData => ({
   changes: [],
   ai: {
     baseUrl: 'https://api.deepseek.com',
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-flash',
     apiKey: '',
   },
   preferences: { autoLockMinutes: 10, historyLimit: 20 },

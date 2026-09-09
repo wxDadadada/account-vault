@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { buildApp } from '../server/app'
 import { createCredentials, encryptVault } from '../src/vault/lib/crypto'
 import { fixtureVault, master } from '../tests/fixtures'
@@ -14,8 +15,37 @@ const app = await buildApp({
   origin,
   staticDir: resolve('dist'),
   test: true,
-  chatCaller: async () => {
-    throw new Error('浏览器测试需要模拟模型回复')
+  chatStreamer: async (input, options) => {
+    const text = input.turns.at(-1)!.text
+    if (!text.startsWith('流式测试'))
+      throw new Error('浏览器测试需要模拟模型回复')
+    options.onProgress?.({
+      type: 'thinking',
+      delta: '先保留已有字段，再核对新信息。',
+    })
+    await delay(250, undefined, { signal: options.signal })
+    options.onProgress?.({ type: 'reply', text: '已经识别' })
+    await delay(250, undefined, { signal: options.signal })
+    options.onProgress?.({ type: 'reply', text: '已经识别这次补充。' })
+    await delay(1800, undefined, { signal: options.signal })
+    if (text.includes('失败'))
+      return {
+        mode: 'capture',
+        reply: '错误回复',
+        items: [{ platform: 'GitHub', password: 'must-reject' }],
+      }
+    return {
+      mode: 'capture',
+      reply: '已经识别这次补充。',
+      items: [
+        {
+          ...input.context.items[0],
+          platform: 'GitHub',
+          username: 'stream-user',
+          subject: '我个人',
+        },
+      ],
+    }
   },
 })
 let closing = false

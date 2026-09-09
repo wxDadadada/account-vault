@@ -58,6 +58,10 @@ async function inViewport(locator: Locator, page: Page) {
     })
     .toBe(true)
 }
+async function expandDraft(page: Page) {
+  const toggle = page.getByRole('button', { name: '展开草稿详情', exact: true })
+  if (await toggle.isVisible()) await toggle.click()
+}
 async function configureCloud(page: Page) {
   await page
     .getByRole('link', { name: '设置', exact: true })
@@ -93,6 +97,7 @@ test('local chat asks missing fields, keeps corrections and secure password, the
   await send(page, 'chat-user')
   await expect(page.getByRole('log')).toContainText('这个账号属于谁')
   await page.getByRole('button', { name: '星河科技', exact: true }).click()
+  await expandDraft(page)
   await page
     .getByLabel('密码（安全字段，可选）', { exact: true })
     .fill('CHAT_PRIVATE_PASSWORD!')
@@ -218,17 +223,19 @@ test('cloud chat carries nonsecret context, handles failures and cancellation, a
   expect(requests).toHaveLength(1)
   await send(page, 'cloud-user')
   await page.getByRole('button', { name: '暂不分配', exact: true }).click()
+  await expandDraft(page)
   await expect(
     page.getByLabel('密码（安全字段，可选）', { exact: true })
   ).toBeVisible()
+  await expandDraft(page)
   await page
     .getByLabel('密码（安全字段，可选）', { exact: true })
     .fill('NEVER_SEND_THIS_SECRET')
   await send(page, '备注改为云端补充')
-  expect(requests).toHaveLength(4)
-  expect(requests[3].turns).toHaveLength(4)
-  expect(requests[3].context.items[0].username).toBe('cloud-user')
-  expect(requests[3].context.items[0].draftId).toBeTruthy()
+  expect(requests).toHaveLength(3)
+  expect(requests[2].turns).toHaveLength(4)
+  expect(requests[2].context.items[0].username).toBe('cloud-user')
+  expect(requests[2].context.items[0].draftId).toBeTruthy()
   for (const secret of [
     'NEVER_SEND_THIS_SECRET',
     'PRIVATE_PASSWORD_SENTINEL',
@@ -237,7 +244,7 @@ test('cloud chat carries nonsecret context, handles failures and cancellation, a
   ])
     expect(JSON.stringify(requests)).not.toContain(secret)
   await send(page, '密码是 should-not-send')
-  expect(requests).toHaveLength(4)
+  expect(requests).toHaveLength(3)
   await expect(page.getByRole('alert')).toContainText('安全字段')
   fail = true
   await send(page, '备注改为重试内容')
@@ -256,7 +263,7 @@ test('cloud chat carries nonsecret context, handles failures and cancellation, a
   await expect(page.getByRole('alert')).toContainText('已停止')
   release?.()
   await expect(input).toHaveValue('备注改为暂停内容')
-  expect(requests).toHaveLength(6)
+  expect(requests).toHaveLength(5)
   pause = false
   await page.getByRole('button', { name: '查找账号', exact: true }).click()
   await send(page, '查找测试云平台')
@@ -266,7 +273,7 @@ test('cloud chat carries nonsecret context, handles failures and cancellation, a
   await expect(results).toContainText('找到 0 个账号')
   await send(page, '不限主体')
   await expect(results).toContainText('找到 1 个账号')
-  expect(requests[8].context.plan?.subject).toBe('星河科技')
+  expect(requests[7].context.plan?.subject).toBe('星河科技')
   await page.getByRole('button', { name: '记录账号', exact: true }).click()
   await expect(
     page.getByLabel('密码（安全字段，可选）', { exact: true })
@@ -323,4 +330,63 @@ test('chat controls remain usable in narrow, landscape, dark and enlarged text l
       path: test.info().outputPath(`chat-${layout}.png`),
     })
   }
+})
+
+test('real HTTP stream displays thinking and partial reply before validation; failures and stop retain the draft', async ({
+  page,
+  context,
+}) => {
+  await configureCloud(page)
+  await openChat(page)
+  const input = page.getByRole('textbox', { name: '发送给 AI 助手的消息' })
+  const stop = page.getByRole('button', { name: '停止回复', exact: true })
+  await input.fill('流式测试第一轮')
+  await page.getByRole('button', { name: '发送消息', exact: true }).click()
+  await expect(page.locator('.chat-thinking')).toContainText('保留已有字段')
+  await expect(page.getByRole('log')).toContainText('已经识别')
+  await expect(stop).toBeVisible()
+  await expect(
+    page.getByRole('region', { name: '待保存的账号草稿' })
+  ).toHaveCount(0)
+  await expect(stop).toHaveCount(0)
+  const drafts = page.getByRole('region', { name: '待保存的账号草稿' })
+  await expect(drafts).toContainText('stream-user')
+  await expect(drafts).toContainText('我个人')
+  await expect(drafts).not.toContainText('新主体')
+  const chatBox = await page.locator('.chat-scroll').boundingBox()
+  expect(chatBox!.height).toBeGreaterThan(270)
+  if (page.viewportSize()!.width > 800) {
+    const draftBox = await drafts.boundingBox()
+    expect(draftBox!.x).toBeGreaterThan(chatBox!.x + chatBox!.width)
+    expect(chatBox!.width).toBeGreaterThan(650)
+  }
+  await page.screenshot({
+    path: test.info().outputPath('chat-stream-complete.png'),
+  })
+  await send(page, '流式测试失败')
+  await expect(page.getByRole('alert')).toContainText('格式不正确')
+  await expect(input).toHaveValue('流式测试失败')
+  await expect(drafts).toContainText('stream-user')
+  await input.fill('流式测试停止')
+  await page.getByRole('button', { name: '发送消息', exact: true }).click()
+  await expect(page.locator('.chat-stream-status')).toBeVisible()
+  await stop.click()
+  await expect(input).toHaveValue('流式测试停止')
+  await expect(drafts).toContainText('stream-user')
+  await expect(page.getByRole('log')).not.toContainText('流式测试停止')
+  const second = await context.newPage()
+  await unlock(second)
+  await input.fill('流式测试锁定')
+  await page.getByRole('button', { name: '发送消息', exact: true }).click()
+  await expect(stop).toBeVisible()
+  await second
+    .getByRole('button', { name: '锁定账号库', exact: true })
+    .filter({ visible: true })
+    .click()
+  await second.getByRole('button', { name: '确认退出', exact: true }).click()
+  await expect(page.getByRole('heading', { name: '欢迎回来' })).toBeVisible()
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await unlock(page)
+  await openChat(page)
+  await expect(page.getByRole('log')).not.toContainText('stream-user')
 })

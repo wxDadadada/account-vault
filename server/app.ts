@@ -19,6 +19,7 @@ import {
   chatResponseSchema,
   type ChatRequest,
 } from '../shared/ai-chat.js'
+import type { ChatStreamEvent } from '../shared/ai-stream.js'
 import {
   credentialsSchema,
   encoded32,
@@ -27,6 +28,7 @@ import {
   type LoginProfile,
   type PublicProfile,
 } from '../shared/protocol.js'
+import type { ModelProgressOptions } from './ai-provider.js'
 import {
   aiRequestSchema,
   callAI,
@@ -57,6 +59,10 @@ export type AppOptions = {
   trustedProxies?: string[]
   aiCaller?: (input: AIRequest) => Promise<unknown>
   chatCaller?: (input: ChatRequest) => Promise<unknown>
+  chatStreamer?: (
+    input: ChatRequest,
+    options: ModelProgressOptions
+  ) => Promise<unknown>
 }
 class HTTPError extends Error {
   constructor(
@@ -668,32 +674,103 @@ export async function buildApp(options: AppOptions) {
     {
       config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
     },
-    async (req) => {
+    async (req, reply) => {
       requireSession(req)
       const input = chatRequestSchema.parse(req.body)
+      let streaming = false
+      let heartbeat: ReturnType<typeof setInterval> | undefined
+      const controller = new AbortController()
+      const disconnect = () => controller.abort()
+      const write = (event: ChatStreamEvent) => {
+        if (reply.raw.destroyed || reply.raw.writableEnded) return
+        reply.raw.write(`data: ${JSON.stringify(event)}\n\n`)
+      }
       try {
         assertChatSafe(input.turns)
         assertChatSafe(input.context)
+        streaming = !!req.headers.accept?.includes('text/event-stream')
+        if (streaming) {
+          reply.hijack()
+          for (const [name, value] of Object.entries(reply.getHeaders()))
+            if (value !== undefined) reply.raw.setHeader(name, value)
+          reply.raw.writeHead(200, {
+            'Content-Type': 'text/event-stream; charset=utf-8',
+            'Cache-Control': 'no-store, no-transform',
+            'X-Accel-Buffering': 'no',
+          })
+          reply.raw.on('close', disconnect)
+          write({ type: 'status', phase: 'connecting' })
+          heartbeat = setInterval(() => {
+            try {
+              requireSession(req)
+              if (!reply.raw.destroyed) reply.raw.write(': keep-alive\n\n')
+            } catch {
+              write({
+                type: 'error',
+                status: 401,
+                code: 'UNAUTHENTICATED',
+                message: '会话已失效，请重新解锁',
+              })
+              controller.abort()
+              reply.raw.end()
+            }
+          }, 10000)
+          heartbeat.unref()
+        }
+        const progress: ModelProgressOptions = {
+          signal: controller.signal,
+          ...(streaming
+            ? {
+                onProgress: (
+                  event: Parameters<
+                    NonNullable<ModelProgressOptions['onProgress']>
+                  >[0]
+                ) => {
+                  controller.signal.throwIfAborted()
+                  requireSession(req)
+                  write(event)
+                },
+              }
+            : {}),
+        }
         const result = chatResponseSchema.parse(
-          await (options.chatCaller
-            ? options.chatCaller(input)
-            : callChat(input, options.aiHosts))
+          await (options.chatStreamer
+            ? options.chatStreamer(input, progress)
+            : options.chatCaller
+              ? options.chatCaller(input)
+              : callChat(input, options.aiHosts, progress))
         )
+        controller.signal.throwIfAborted()
         requireSession(req)
         if (result.mode !== input.mode)
           throw new Error('AI 回复模式不正确，请重试')
-        return result
+        if (streaming) write({ type: 'result', result })
+        else return result
       } catch (e) {
-        if (e instanceof HTTPError) throw e
-        throw new HTTPError(
-          422,
-          e instanceof z.ZodError
-            ? 'AI 回复格式不正确，当前草稿已保留，请重试'
-            : e instanceof Error && !e.message.includes('fetch')
-              ? e.message
-              : '无法连接 AI 服务，请检查配置或稍后重试',
-          'AI_FAILED'
-        )
+        const error =
+          e instanceof HTTPError
+            ? e
+            : new HTTPError(
+                422,
+                e instanceof z.ZodError
+                  ? 'AI 回复格式不正确，当前草稿已保留，请重试'
+                  : e instanceof Error && !e.message.includes('fetch')
+                    ? e.message
+                    : '无法连接 AI 服务，请检查配置或稍后重试',
+                'AI_FAILED'
+              )
+        if (!streaming) throw error
+        if (!controller.signal.aborted)
+          write({
+            type: 'error',
+            message: error.message,
+            code: error.code,
+            status: error.statusCode,
+          })
+      } finally {
+        clearInterval(heartbeat)
+        reply.raw.off('close', disconnect)
+        if (streaming && !reply.raw.writableEnded) reply.raw.end()
       }
     }
   )

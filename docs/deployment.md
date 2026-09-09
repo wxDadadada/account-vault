@@ -39,6 +39,19 @@ docker compose exec app cat /app/data/setup-token
 
 核对 `docker-compose.yml` 中的 `APP_ORIGIN` 与浏览器地址是否一致。例如浏览器访问 `https://account.wxda.cc/`，配置就是 `https://account.wxda.cc`。`8188` 是宝塔连接后端的端口，无需加到使用默认 HTTPS 端口的域名后面。修改文件后运行 `docker compose up -d` 并刷新页面；单独 `restart` 不会应用环境变量变更。
 
+### AI 流式回复
+
+`/api/ai/chat` 使用 SSE 传输进度与结果，响应带有 `X-Accel-Buffering: no` 和禁止缓存的标头，每 10 秒发送一次保活。一次模型整理及格式重试共用 120 秒上限。更新镜像后刷新页面即可启用新界面，模型服务需支持 Chat Completions；思考展示取决于模型是否返回 `reasoning_content`。
+
+如果宝塔仍然等到最后才显示整段内容，请检查该路径是否被额外缓存，或忽略了 `X-Accel-Buffering`。可在现有的反向代理 `location` 中增加以下配置并重新加载 Nginx，保留原有代理地址与请求头设置：
+
+```nginx
+proxy_buffering off;
+proxy_read_timeout 150s;
+```
+
+Nginx 对响应标头与缓冲的处理参见[官方代理模块文档](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_buffering)。新版 DeepSeek 预设为 `deepseek-v4-flash`，首次整理使用低强度思考，格式重试关闭思考以便尽快修正结构；已有加密 AI 配置不会被自动覆盖，其他服务商仍使用其配置的模型。
+
 ## 本机 Docker / Docker Desktop
 
 本机使用独立的桥接网络配置 `docker-compose.local.yml`，无需启用 Docker Desktop 的 host 网络功能：

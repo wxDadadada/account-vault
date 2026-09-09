@@ -31,6 +31,7 @@ import {
   MAX_CHAT_TURNS,
   type ChatTurn,
 } from '../../../shared/ai-chat'
+import type { ChatProgress } from '../../../shared/ai-stream'
 import { type SearchPlan } from '../../../shared/protocol'
 import { useDiscardConfirmation } from '../hooks/use-discard-confirmation'
 import {
@@ -45,7 +46,7 @@ import {
   type Draft,
   type Question,
 } from '../lib/ai-conversation'
-import { api } from '../lib/api'
+import { streamChat } from '../lib/ai-stream'
 import { sessionEpoch } from '../lib/lock-sync'
 import { type Account } from '../lib/model'
 import { useVault } from '../state/context'
@@ -55,7 +56,29 @@ import { PasswordField } from './fields'
 import { Busy, PlatformIcon } from './ui'
 
 type Mode = 'capture' | 'search'
-type Message = { id: string; role: 'user' | 'assistant'; text: string }
+type Message = {
+  id: string
+  role: 'user' | 'assistant'
+  text: string
+  thinking?: string
+}
+type Progress = {
+  phase: Extract<ChatProgress, { type: 'status' }>['phase']
+  thinking: string
+  reply: string
+}
+const emptyProgress = (): Progress => ({
+  phase: 'connecting',
+  thinking: '',
+  reply: '',
+})
+const phaseLabels = {
+  connecting: '正在连接模型…',
+  thinking: '正在思考…',
+  replying: '正在生成回复…',
+  validating: '正在核对草稿…',
+  repairing: '正在重新整理格式…',
+}
 type Conversation = {
   messages: Message[]
   turns: ChatTurn[]
@@ -64,10 +87,15 @@ type Conversation = {
   question: Question | null
   choices: string[]
 }
-const message = (role: Message['role'], text: string): Message => ({
+const message = (
+  role: Message['role'],
+  text: string,
+  thinking?: string
+): Message => ({
   id: crypto.randomUUID(),
   role,
   text,
+  thinking,
 })
 const fresh = (mode: Mode): Conversation => ({
   messages: [
@@ -119,6 +147,9 @@ export function AIComposer({
   )
   const [working, setWorking] = useState(false)
   const [pendingText, setPendingText] = useState('')
+  const [progress, setProgress] = useState(emptyProgress)
+  const [elapsed, setElapsed] = useState(0)
+  const [draftExpanded, setDraftExpanded] = useState(false)
   const [error, setError] = useState('')
   const [review, setReview] = useState(false)
   const { confirmDiscard, discardDialog, onEscapeKeyDown } =
@@ -126,6 +157,7 @@ export function AIComposer({
   const request = useRef<AbortController | null>(null)
   const mounted = useRef(true)
   const scroll = useRef<HTMLDivElement>(null)
+  const follow = useRef(true)
   const input = useRef<HTMLTextAreaElement>(null)
   const current = conversations[mode]
   const capture = conversations.capture
@@ -137,11 +169,18 @@ export function AIComposer({
     }
   }, [])
   useEffect(() => {
-    if (!review && scroll.current)
-      scroll.current
-        .querySelector('.chat-message:last-child')
-        ?.scrollIntoView({ block: 'start' })
-  }, [current.messages.length, pendingText, mode, review])
+    if (!review && scroll.current && follow.current)
+      scroll.current.scrollTop = scroll.current.scrollHeight
+  }, [current.messages.length, pendingText, progress, mode, review])
+  useEffect(() => {
+    if (!working) return
+    const started = Date.now()
+    const timer = setInterval(
+      () => setElapsed(Math.floor((Date.now() - started) / 1000)),
+      1000
+    )
+    return () => clearInterval(timer)
+  }, [working])
   if (!data) return null
   const currentData = data
   const feedback = current.plan
@@ -188,16 +227,19 @@ export function AIComposer({
     setWorking(false)
     setText(pendingText)
     setPendingText('')
+    setProgress(emptyProgress())
     setError('已停止，本次输入和之前的草稿已保留')
     requestAnimationFrame(() => input.current?.focus())
   }
   function switchMode(next: Mode) {
+    follow.current = true
     setMode(next)
     setReview(false)
     setError('')
     input.current?.focus()
   }
   function startNew() {
+    follow.current = true
     update(mode, () => fresh(mode))
     setText('')
     setError('')
@@ -350,12 +392,23 @@ export function AIComposer({
     setError('')
     setWorking(true)
     setPendingText(content)
+    follow.current = true
+    setElapsed(0)
+    setProgress(emptyProgress())
+    let streamed = emptyProgress()
+    const directChoice =
+      nextMode === 'capture' &&
+      !!pendingQuestion &&
+      ((pendingQuestion.field === 'subject' &&
+        (content === '暂不分配' ||
+          currentData.subjects.some((subject) => subject.name === content))) ||
+        (pendingQuestion.field === 'platform' &&
+          pendingQuestion.choices?.includes(content)))
     try {
       const result =
-        engine === 'cloud'
+        engine === 'cloud' && !directChoice
           ? chatResponseSchema.parse(
-              await api(
-                '/ai/chat',
+              await streamChat(
                 chatRequestSchema.parse({
                   mode: nextMode,
                   turns,
@@ -363,8 +416,37 @@ export function AIComposer({
                   config: currentData.ai,
                   categories: currentData.categories,
                 }),
-                'POST',
-                controller.signal
+                controller.signal,
+                (event) => {
+                  if (
+                    !mounted.current ||
+                    request.current !== controller ||
+                    controller.signal.aborted ||
+                    generation !== sessionEpoch()
+                  )
+                    return
+                  if (event.type === 'status')
+                    streamed =
+                      event.phase === 'repairing'
+                        ? { ...emptyProgress(), phase: 'repairing' }
+                        : { ...streamed, phase: event.phase }
+                  else if (event.type === 'thinking')
+                    streamed = {
+                      ...streamed,
+                      phase: 'thinking',
+                      thinking: (streamed.thinking + event.delta).slice(
+                        0,
+                        64000
+                      ),
+                    }
+                  else
+                    streamed = {
+                      ...streamed,
+                      phase: 'replying',
+                      reply: event.text,
+                    }
+                  setProgress(streamed)
+                }
               )
             )
           : chatResponseSchema.parse(
@@ -386,9 +468,7 @@ export function AIComposer({
           previous.drafts
         )
         const next = captureQuestion(drafts, currentData)
-        const reply =
-          next?.text ??
-          '基础信息已经齐了。可以继续补充邮箱、用途或标签，密码请填在安全字段中；核对草稿后即可保存。'
+        const reply = next?.text ?? '信息已补齐，可继续补充，或核对后保存。'
         update(nextMode, (old) => ({
           ...old,
           turns,
@@ -399,7 +479,8 @@ export function AIComposer({
             message('user', content),
             message(
               'assistant',
-              [result.reply, reply].filter(Boolean).join('\n\n')
+              [result.reply, reply].filter(Boolean).join('\n'),
+              streamed.thinking
             ),
           ],
         }))
@@ -415,7 +496,8 @@ export function AIComposer({
             message('user', content),
             message(
               'assistant',
-              [result.reply, found.message].filter(Boolean).join('\n\n')
+              [result.reply, found.message].filter(Boolean).join('\n'),
+              streamed.thinking
             ),
           ],
         }))
@@ -430,15 +512,18 @@ export function AIComposer({
         setError(
           controller.signal.aborted
             ? '已停止，本次输入和之前的草稿已保留'
-            : e instanceof Error
-              ? e.message
-              : '回复失败，请重试'
+            : e instanceof Error && e.name === 'ZodError'
+              ? 'AI 回复格式不正确，当前草稿已保留，请重试'
+              : e instanceof Error
+                ? e.message
+                : '回复失败，请重试'
         )
       }
     } finally {
       if (mounted.current && request.current === controller) {
         setWorking(false)
         setPendingText('')
+        setProgress(emptyProgress())
         request.current = null
         input.current?.focus()
       }
@@ -503,247 +588,299 @@ export function AIComposer({
                 新对话
               </Button>
             </div>
-            <div className='chat-scroll' ref={scroll}>
+            <div
+              className={`chat-body ${mode === 'capture' && current.drafts.length ? 'has-drafts' : ''}`}
+            >
               <div
-                role='log'
-                aria-label='助手对话'
-                aria-live='polite'
-                aria-relevant='additions'
-                className='chat-messages'
+                className='chat-scroll'
+                ref={scroll}
+                onScroll={() => {
+                  const element = scroll.current
+                  if (element)
+                    follow.current =
+                      element.scrollHeight -
+                        element.scrollTop -
+                        element.clientHeight <
+                      64
+                }}
               >
-                {current.messages.map((m) => (
-                  <div key={m.id} className={`chat-message ${m.role}`}>
-                    <span className='chat-speaker'>
-                      {m.role === 'assistant' ? (
-                        <>
+                <div
+                  role='log'
+                  aria-label='助手对话'
+                  aria-live='polite'
+                  aria-relevant='additions'
+                  className='chat-messages'
+                >
+                  {current.messages.map((m) => (
+                    <div key={m.id} className={`chat-message ${m.role}`}>
+                      <span className='chat-speaker'>
+                        {m.role === 'assistant' ? (
+                          <>
+                            <Sparkles size={14} />
+                            拾钥助手
+                          </>
+                        ) : (
+                          '你'
+                        )}
+                      </span>
+                      {m.thinking && (
+                        <details className='chat-thinking'>
+                          <summary>查看模型思考</summary>
+                          <div>{m.thinking}</div>
+                        </details>
+                      )}
+                      <div className='chat-bubble'>{m.text}</div>
+                    </div>
+                  ))}
+                  {working && (
+                    <>
+                      <div className='chat-message user'>
+                        <span className='chat-speaker'>你</span>
+                        <div className='chat-bubble'>{pendingText}</div>
+                      </div>
+                      <div className='chat-message assistant'>
+                        <span className='chat-speaker'>
                           <Sparkles size={14} />
                           拾钥助手
-                        </>
-                      ) : (
-                        '你'
-                      )}
-                    </span>
-                    <div className='chat-bubble'>{m.text}</div>
-                  </div>
-                ))}
-                {working && (
-                  <>
-                    <div className='chat-message user'>
-                      <span className='chat-speaker'>你</span>
-                      <div className='chat-bubble'>{pendingText}</div>
-                    </div>
-                    <div className='chat-message assistant'>
-                      <span className='chat-speaker'>
-                        <Sparkles size={14} />
-                        拾钥助手
-                      </span>
-                      <div className='chat-bubble'>
-                        <Busy
-                          text={
-                            engine === 'cloud' ? '正在理解并整理…' : '正在整理…'
-                          }
-                        />
+                        </span>
+                        <div className='chat-stream-status' role='status'>
+                          <Busy
+                            text={
+                              engine === 'cloud'
+                                ? phaseLabels[progress.phase]
+                                : '正在整理…'
+                            }
+                          />
+                          <span aria-hidden='true'>{elapsed} 秒</span>
+                        </div>
+                        {progress.thinking && (
+                          <details
+                            className='chat-thinking'
+                            open={progress.phase === 'thinking'}
+                          >
+                            <summary>模型思考</summary>
+                            <div aria-live='off'>{progress.thinking}</div>
+                          </details>
+                        )}
+                        {progress.reply && (
+                          <div className='chat-bubble' aria-live='off'>
+                            {progress.reply}
+                          </div>
+                        )}
                       </div>
+                    </>
+                  )}
+                </div>
+                {!working && (
+                  <>
+                    {question?.targets?.length ? (
+                      <div
+                        className='chat-targets'
+                        aria-label='请选择要更新的账号'
+                      >
+                        {question.targets.slice(0, 20).map((account, index) => (
+                          <Button
+                            key={account.id}
+                            variant='outline'
+                            onClick={() =>
+                              chooseTarget(
+                                account,
+                                question.itemIndex ?? 0,
+                                `选择第 ${index + 1} 个账号`
+                              )
+                            }
+                          >
+                            <span>
+                              <strong>
+                                {index + 1}. {account.platform} ·{' '}
+                                {account.username}
+                              </strong>
+                              <small>
+                                {currentData.subjects.find(
+                                  (s) => s.id === account.subjectId
+                                )?.name ?? '未分配主体'}
+                              </small>
+                            </span>
+                            <ChevronRight size={16} />
+                          </Button>
+                        ))}
+                      </div>
+                    ) : null}
+                    <div className='chat-suggestions'>
+                      {(
+                        question?.choices ??
+                        (mode === 'search' && feedback
+                          ? feedback.choices
+                          : current.turns.length
+                            ? []
+                            : mode === 'capture'
+                              ? [
+                                  '帮我记一个账号',
+                                  'GitHub 账号是 hello@example.com，属于我个人',
+                                ]
+                              : [
+                                  '查找所有云服务账号',
+                                  '找出最近 7 天修改过密码的账号',
+                                ])
+                      ).map((choice) => (
+                        <Button
+                          key={choice}
+                          variant='outline'
+                          disabled={busy}
+                          onClick={() => void send(choice)}
+                        >
+                          {choice}
+                          <ArrowRight size={13} />
+                        </Button>
+                      ))}
                     </div>
+                    {mode === 'search' && feedback && !feedback.asking && (
+                      <section
+                        className='ai-search-results'
+                        aria-label='对话查询结果'
+                      >
+                        <div className='results-caption'>
+                          <span>找到 {feedback.results.length} 个账号</span>
+                          <small>仅在本机筛选</small>
+                        </div>
+                        <div className='search-plan-chips'>
+                          {[
+                            ...current.plan!.keywords,
+                            current.plan!.subject,
+                            current.plan!.category,
+                            current.plan!.favorite === true
+                              ? '已收藏'
+                              : current.plan!.favorite === false
+                                ? '未收藏'
+                                : '',
+                            current.plan!.status === 'active'
+                              ? '使用中'
+                              : current.plan!.status === 'inactive'
+                                ? '已停用'
+                                : current.plan!.status === 'pending'
+                                  ? '待完善'
+                                  : '',
+                            current.plan!.changedField ? '指定字段有变更' : '',
+                            current.plan!.updatedAfter
+                              ? `自 ${new Date(current.plan!.updatedAfter).toLocaleDateString('zh-CN')}`
+                              : '',
+                          ]
+                            .filter(Boolean)
+                            .map((label, i) => (
+                              <span key={i}>{label}</span>
+                            ))}
+                        </div>
+                        {feedback.results.slice(0, 50).map((account) => (
+                          <Button
+                            key={account.id}
+                            variant='ghost'
+                            className='ai-search-result'
+                            onClick={() => onSelect(account)}
+                          >
+                            <PlatformIcon account={account} small />
+                            <span>
+                              <strong>{account.platform}</strong>
+                              <small>
+                                {account.username} ·{' '}
+                                {currentData.subjects.find(
+                                  (s) => s.id === account.subjectId
+                                )?.name ?? '未分配主体'}
+                              </small>
+                            </span>
+                            <ArrowRight size={16} />
+                          </Button>
+                        ))}
+                        {feedback.results.length > 50 && (
+                          <p className='field-hint'>
+                            先展示前 50 个账号，补充条件可以缩小范围。
+                          </p>
+                        )}
+                      </section>
+                    )}
                   </>
                 )}
               </div>
-              {!working && (
-                <>
-                  {question?.targets?.length ? (
-                    <div
-                      className='chat-targets'
-                      aria-label='请选择要更新的账号'
-                    >
-                      {question.targets.slice(0, 20).map((account, index) => (
-                        <Button
-                          key={account.id}
-                          variant='outline'
-                          onClick={() =>
-                            chooseTarget(
-                              account,
-                              question.itemIndex ?? 0,
-                              `选择第 ${index + 1} 个账号`
-                            )
-                          }
-                        >
-                          <span>
-                            <strong>
-                              {index + 1}. {account.platform} ·{' '}
-                              {account.username}
-                            </strong>
-                            <small>
-                              {currentData.subjects.find(
-                                (s) => s.id === account.subjectId
-                              )?.name ?? '未分配主体'}
-                            </small>
-                          </span>
-                          <ChevronRight size={16} />
-                        </Button>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className='chat-suggestions'>
-                    {(
-                      question?.choices ??
-                      (mode === 'search' && feedback
-                        ? feedback.choices
-                        : current.turns.length
-                          ? []
-                          : mode === 'capture'
-                            ? [
-                                '帮我记一个账号',
-                                'GitHub 账号是 hello@example.com，属于我个人',
-                              ]
-                            : [
-                                '查找所有云服务账号',
-                                '找出最近 7 天修改过密码的账号',
-                              ])
-                    ).map((choice) => (
-                      <Button
-                        key={choice}
-                        variant='outline'
-                        disabled={busy}
-                        onClick={() => void send(choice)}
-                      >
-                        {choice}
-                        <ArrowRight size={13} />
-                      </Button>
-                    ))}
+              {mode === 'capture' && current.drafts.length > 0 && (
+                <section
+                  className={`chat-draft-preview ${draftExpanded ? 'expanded' : ''}`}
+                  aria-busy={working}
+                  aria-label='待保存的账号草稿'
+                >
+                  <div className='chat-preview-heading'>
+                    <span>
+                      <Check size={16} />
+                      {ready ? '信息已补齐' : '正在补全'} ·{' '}
+                      {current.drafts.length} 个账号
+                    </span>
+                    <small>尚未保存</small>
                   </div>
-                  {mode === 'capture' && current.drafts.length > 0 && (
-                    <section
-                      className='chat-draft-preview'
-                      aria-label='待保存的账号草稿'
-                    >
-                      <div className='chat-preview-heading'>
-                        <span>
-                          <Check size={16} />
-                          {ready ? '信息已补齐' : '正在补全'} ·{' '}
-                          {current.drafts.length} 个账号
-                        </span>
-                        <small>尚未保存</small>
-                      </div>
-                      {current.drafts.map((draft, index) => (
-                        <div className='chat-draft-summary' key={draft.id}>
-                          <span className='chat-draft-index'>{index + 1}</span>
-                          <div>
-                            <strong>
-                              {draft.account.platform || '平台待补充'}
-                            </strong>
-                            <span>
-                              {draft.account.username || '账号待补充'}
-                            </span>
-                            <small>
-                              {draft.subjectConfirmed
-                                ? draft.account.subjectId === '__new__'
-                                  ? `${draft.subjectName}（新主体）`
-                                  : (currentData.subjects.find(
-                                      (s) => s.id === draft.account.subjectId
-                                    )?.name ?? '暂不分配主体')
-                                : '主体待确认'}{' '}
-                              ·{' '}
-                              {draft.original
-                                ? '更新已有账号'
-                                : draft.needsTarget
-                                  ? '更新目标待确认'
-                                  : '新建账号'}
-                            </small>
-                          </div>
+                  <Button
+                    type='button'
+                    variant='ghost'
+                    className='chat-draft-toggle'
+                    aria-expanded={draftExpanded}
+                    onClick={() => setDraftExpanded(!draftExpanded)}
+                  >
+                    {draftExpanded ? '收起草稿详情' : '展开草稿详情'}
+                  </Button>
+                  <fieldset
+                    className='chat-draft-details'
+                    disabled={working || busy}
+                  >
+                    {current.drafts.map((draft, index) => (
+                      <div className='chat-draft-summary' key={draft.id}>
+                        <span className='chat-draft-index'>{index + 1}</span>
+                        <div>
+                          <strong>
+                            {draft.account.platform || '平台待补充'}
+                          </strong>
+                          <span>{draft.account.username || '账号待补充'}</span>
+                          <small>
+                            {draft.subjectConfirmed
+                              ? draft.account.subjectId === '__new__'
+                                ? `${draft.subjectName}（新主体）`
+                                : (currentData.subjects.find(
+                                    (s) => s.id === draft.account.subjectId
+                                  )?.name ?? '暂不分配主体')
+                              : '主体待确认'}{' '}
+                            ·{' '}
+                            {draft.original
+                              ? '更新已有账号'
+                              : draft.needsTarget
+                                ? '更新目标待确认'
+                                : '新建账号'}
+                          </small>
                         </div>
-                      ))}
-                      {current.drafts.length === 1 && ready && (
-                        <PasswordField
-                          label='密码（安全字段，可选）'
-                          value={current.drafts[0].account.password}
-                          onChange={(password) =>
-                            setDrafts((ds) =>
-                              ds.map((d) =>
-                                patchDraft(d, { password }, currentData)
-                              )
+                      </div>
+                    ))}
+                    {current.drafts.length === 1 && ready && (
+                      <PasswordField
+                        label='密码（安全字段，可选）'
+                        value={current.drafts[0].account.password}
+                        onChange={(password) =>
+                          setDrafts((ds) =>
+                            ds.map((d) =>
+                              patchDraft(d, { password }, currentData)
                             )
-                          }
-                          placeholder='仅在设备上使用，不会发送给模型'
-                        />
-                      )}
-                      <Button
-                        className={ready ? 'primary-button' : ''}
-                        variant={ready ? 'default' : 'outline'}
-                        disabled={busy}
-                        onClick={() => {
-                          setReview(true)
-                          setError('')
-                        }}
-                      >
-                        {ready ? '核对并保存' : '查看并编辑草稿'}
-                        <ArrowRight size={16} />
-                      </Button>
-                    </section>
-                  )}
-                  {mode === 'search' && feedback && !feedback.asking && (
-                    <section
-                      className='ai-search-results'
-                      aria-label='对话查询结果'
-                    >
-                      <div className='results-caption'>
-                        <span>找到 {feedback.results.length} 个账号</span>
-                        <small>仅在本机筛选</small>
-                      </div>
-                      <div className='search-plan-chips'>
-                        {[
-                          ...current.plan!.keywords,
-                          current.plan!.subject,
-                          current.plan!.category,
-                          current.plan!.favorite === true
-                            ? '已收藏'
-                            : current.plan!.favorite === false
-                              ? '未收藏'
-                              : '',
-                          current.plan!.status === 'active'
-                            ? '使用中'
-                            : current.plan!.status === 'inactive'
-                              ? '已停用'
-                              : current.plan!.status === 'pending'
-                                ? '待完善'
-                                : '',
-                          current.plan!.changedField ? '指定字段有变更' : '',
-                          current.plan!.updatedAfter
-                            ? `自 ${new Date(current.plan!.updatedAfter).toLocaleDateString('zh-CN')}`
-                            : '',
-                        ]
-                          .filter(Boolean)
-                          .map((label, i) => (
-                            <span key={i}>{label}</span>
-                          ))}
-                      </div>
-                      {feedback.results.slice(0, 50).map((account) => (
-                        <Button
-                          key={account.id}
-                          variant='ghost'
-                          className='ai-search-result'
-                          onClick={() => onSelect(account)}
-                        >
-                          <PlatformIcon account={account} small />
-                          <span>
-                            <strong>{account.platform}</strong>
-                            <small>
-                              {account.username} ·{' '}
-                              {currentData.subjects.find(
-                                (s) => s.id === account.subjectId
-                              )?.name ?? '未分配主体'}
-                            </small>
-                          </span>
-                          <ArrowRight size={16} />
-                        </Button>
-                      ))}
-                      {feedback.results.length > 50 && (
-                        <p className='field-hint'>
-                          先展示前 50 个账号，补充条件可以缩小范围。
-                        </p>
-                      )}
-                    </section>
-                  )}
-                </>
+                          )
+                        }
+                        placeholder='仅在设备上使用，不会发送给模型'
+                      />
+                    )}
+                  </fieldset>
+                  <Button
+                    className={ready ? 'primary-button' : ''}
+                    variant={ready ? 'default' : 'outline'}
+                    disabled={busy || working}
+                    onClick={() => {
+                      setReview(true)
+                      setError('')
+                    }}
+                  >
+                    {ready ? '核对并保存' : '查看并编辑草稿'}
+                    <ArrowRight size={16} />
+                  </Button>
+                </section>
               )}
             </div>
             <form
@@ -758,7 +895,7 @@ export function AIComposer({
                   {error}
                 </div>
               )}
-              <label className='chat-input-label' htmlFor='assistant-message'>
+              <label className='sr-only' htmlFor='assistant-message'>
                 继续对话
               </label>
               <div className='chat-input-row'>

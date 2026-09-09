@@ -216,7 +216,7 @@ export function SettingsPage() {
                     {
                       label: 'DeepSeek',
                       baseUrl: 'https://api.deepseek.com',
-                      model: 'deepseek-chat',
+                      model: 'deepseek-v4-flash',
                     },
                     {
                       label: 'Moonshot',
@@ -302,7 +302,7 @@ export function SettingsPage() {
       </div>
       <div className='about-line'>
         <span>
-          <ShieldCheck size={15} /> 拾钥 Keyfolio · 0.1.1
+          <ShieldCheck size={15} /> 拾钥 Keyfolio · 0.1.2
         </span>
         <a
           href='https://github.com/satnaing/shadcn-admin'

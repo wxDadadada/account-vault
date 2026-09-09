@@ -224,6 +224,8 @@ test('chat keeps per-mode input and protects drafts on reset and close', async (
   await page.getByRole('button', { name: '清空并开始', exact: true }).click()
   await expect(input).toHaveValue('')
   await send(page, 'GitHub 账号是 staged-user，属于我个人')
+  const expand = page.getByRole('button', { name: '展开草稿详情', exact: true })
+  if (await expand.isVisible()) await expand.click()
   await page
     .getByLabel('密码（安全字段，可选）', { exact: true })
     .fill('STAGED_CHAT_SECRET')
