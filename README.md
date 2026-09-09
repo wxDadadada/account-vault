@@ -50,7 +50,7 @@ docker build -t keyfolio:local .
 IMAGE=keyfolio:local docker compose up -d
 ```
 
-浏览器打开 **http://localhost:4318**。首次创建用户名和至少 12 个字符的主密码，保存恢复密钥，即可使用。
+浏览器打开 **http://localhost:8188**。首次创建用户名和至少 12 个字符的主密码，保存恢复密钥，即可使用。
 
 SQLite、双重验证服务密钥和自动快照持久保存在 `keyfolio_data` 命名卷中。平时使用 `docker compose down` 可保留数据；**不要加 `-v`，它会删除数据卷**。
 
@@ -72,7 +72,7 @@ pnpm install --frozen-lockfile
 pnpm dev
 ```
 
-前端为 **http://127.0.0.1:5188**，开发 API 为 `127.0.0.1:4318`，数据目录为项目内 `data/`。这与 Docker 命名卷是两套独立存储。开发 API 和 Docker 默认都使用 4318 端口，切换运行方式前请停止前一种方式。
+前端为 **http://127.0.0.1:5188**，开发 API 为 `127.0.0.1:4318`，Docker 默认映射到宿主机 `8188` 端口。开发数据目录为项目内 `data/`，与 Docker 命名卷是两套独立存储。
 
 本地生产运行：
 
@@ -81,7 +81,7 @@ pnpm build
 pnpm start
 ```
 
-`pnpm start` 读取可选的 `.env`，默认开启生产模式并使用 4318 端口。`pnpm dev` 使用默认开发端口；自定义开发 API 端口时还需修改 `vite.config.ts` 中的代理目标。
+`pnpm start` 读取可选的 `.env`，默认开启生产模式；未配置 `PORT` 时使用 4318，使用 `.env.example` 的配置时为 8188。`pnpm dev` 使用默认开发端口；自定义开发 API 端口时还需修改 `vite.config.ts` 中的代理目标。
 
 ## 日常使用
 

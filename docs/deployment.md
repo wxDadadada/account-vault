@@ -28,7 +28,7 @@ docker compose ps
 
 ## 本机 Docker
 
-在 `docker-compose.yml` 所在目录运行 `docker compose up -d`，打开 `http://localhost:4318`。Compose 默认仅绑定宿主机回环地址，数据位于持久卷。容器使用非 root 用户、只读根文件系统和独立可写数据卷。
+在 `docker-compose.yml` 所在目录运行 `docker compose up -d`，打开 `http://localhost:8188`。Compose 默认将宿主机 `127.0.0.1:8188` 映射到容器 `4318`，数据位于持久卷。容器使用非 root 用户、只读根文件系统和独立可写数据卷。
 
 查看实际卷名：
 
@@ -43,7 +43,7 @@ docker inspect "$(docker compose ps -q app)" --format '{{json .Mounts}}'
 1. 在 `docker-compose.yml` 同目录创建 `.env`；克隆了源码时也可复制 `.env.example` 为 `.env`。
 2. 将 `APP_ORIGIN` 改为最终访问地址，例如 `https://vault.example.com`。它必须与浏览器地址的协议、域名和端口一致。
 3. 设置 `TRUSTED_PROXIES` 为应用实际看到的直连代理 IP 或精确 CIDR，英文逗号分隔。本地 Node 与同机代理通常为 `127.0.0.1,::1`；Docker 中可能是桥接网关，不能直接套用回环地址。只填写自己控制的代理，禁止全网范围。
-4. 用宿主机反向代理提供 TLS，将请求转发至 `127.0.0.1:4318`。保留请求的 Cookie、Origin 和自定义头，覆盖外部传入的客户端 IP 头，不缓存 `/api/`。后端保持回环绑定。
+4. 用宿主机反向代理提供 TLS，将请求转发至 `127.0.0.1:8188`。保留请求的 Cookie、Origin 和自定义头，覆盖外部传入的客户端 IP 头，不缓存 `/api/`。后端保持回环绑定。
 5. 运行 `docker compose up -d`。
 6. 从服务器读取首次初始化令牌：
 
@@ -61,7 +61,7 @@ docker compose exec app cat /app/data/setup-token
 
 ```caddyfile
 vault.example.com {
-    reverse_proxy 127.0.0.1:4318 {
+    reverse_proxy 127.0.0.1:8188 {
         header_up X-Forwarded-For {remote_host}
     }
 }
@@ -84,15 +84,15 @@ docker inspect "$(docker compose ps -q app)" --format '{{range .NetworkSettings.
 | 变量               | 默认值                                | 用途                                                  |
 | ------------------ | ------------------------------------- | ----------------------------------------------------- |
 | `IMAGE`            | `wxdadadada/account-vault:0.1.0`      | Compose 镜像名；自行构建时可使用 `keyfolio:local`     |
-| `APP_ORIGIN`       | `http://localhost:4318`               | 浏览器实际访问来源；远程须为 HTTPS                    |
-| `PORT`             | `4318`                                | Compose 宿主机映射端口；Node 直接运行时为服务监听端口 |
+| `APP_ORIGIN`       | `http://localhost:8188`               | Compose 浏览器实际访问来源；远程须为 HTTPS            |
+| `PORT`             | Compose 为 `8188`，Node 为 `4318`     | Compose 宿主机映射端口；Node 直接运行时为服务监听端口 |
 | `HOST`             | Node 为 `127.0.0.1`，容器为 `0.0.0.0` | 服务绑定地址                                          |
 | `DATA_DIR`         | Node 为 `./data`，容器为 `/app/data`  | SQLite 与服务密钥目录                                 |
 | `BACKUP_DIR`       | 数据目录下 `backups`                  | SQLite 在线快照目录                                   |
 | `AI_ALLOWED_HOSTS` | 见 `.env.example`                     | 允许连接的 AI 域名，英文逗号分隔                      |
 | `TRUSTED_PROXIES`  | 空                                    | 可信直连代理 IP/CIDR；远程部署必填，本机直连可留空    |
 
-修改 Compose 的 `PORT` 时也要修改 `APP_ORIGIN`。更改变量后用 `docker compose up -d` 重建容器，而非只运行 `restart`。
+修改 Compose 的 `PORT` 时也要修改 `APP_ORIGIN`。已有 `.env` 会覆盖 Compose 默认值；从 4318 切换时，将其中的 `PORT` 改为 `8188`，本机访问的 `APP_ORIGIN` 改为 `http://localhost:8188`，远程 HTTPS 域名保持实际访问地址。更改变量后用 `docker compose up -d` 重建容器，而非只运行 `restart`。
 
 Compose 的 `.env` 用于变量插值，`IMAGE` 选择镜像，`PORT` 用于宿主映射；仅将 `APP_ORIGIN`、`AI_ALLOWED_HOSTS`、`TRUSTED_PROXIES` 显式传入容器。`HOST`、`DATA_DIR`、`BACKUP_DIR` 需要在 Compose 的 environment/volumes 中显式配置；只修改 `.env` 不会改变它们。本地 `pnpm start` 会加载 `.env` 中的这些服务变量。
 

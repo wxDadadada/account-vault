@@ -1,5 +1,5 @@
 # 独立部署：保存本文件后执行 docker compose up -d。
-# 远程访问：配置 APP_ORIGIN、TRUSTED_PROXIES，并用 HTTPS 反向代理连接本机 4318 端口。
+# 远程访问：配置 APP_ORIGIN、TRUSTED_PROXIES，并用 HTTPS 反向代理连接本机 8188 端口。
 name: account-vault
 
 services:
@@ -7,9 +7,9 @@ services:
     image: ${IMAGE:-wxdadadada/account-vault:0.1.0}
     restart: unless-stopped
     ports:
-      - '127.0.0.1:${PORT:-4318}:4318'
+      - '127.0.0.1:${PORT:-8188}:4318'
     environment:
-      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:4318}
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8188}
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-}
       AI_ALLOWED_HOSTS: ${AI_ALLOWED_HOSTS:-api.deepseek.com,api.openai.com,api.moonshot.cn,api.moonshot.ai,dashscope.aliyuncs.com,openrouter.ai}
     volumes:
